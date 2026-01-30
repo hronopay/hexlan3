@@ -1,0 +1,133 @@
+# -*- mode: Makefile; -*-
+# Mac OS X makefile for Hexland - Final x86_64 Version
+
+CXX=clang++
+C=clang
+
+# Основные пути: Теперь используем твой собранный Boost 1.58
+INCLUDEPATHS= \
+ -I$(HOME)/openssl-1.0.2l/include \
+ -I$(HOME)/boost_1_58_0 \
+ -I/opt/local/include/db48 \
+ -I/opt/local/include \
+ -I$(CURDIR) \
+ -I$(CURDIR)/obj \
+ -I$(CURDIR)/secp256k1/include \
+ -I$(CURDIR)/leveldb/include \
+ -I$(CURDIR)/leveldb/helpers
+
+LIBPATHS= \
+ -L$(HOME)/openssl-1.0.2l \
+ -L$(HOME)/boost_1_58_0/stage/lib \
+ -L/opt/local/lib/db48 \
+ -L/opt/local/lib \
+ -L$(CURDIR)/leveldb
+
+USE_UPNP:=1
+USE_WALLET:=1
+
+DEFS=-DMAC_OSX -DMSG_NOSIGNAL=0 -DBOOST_SPIRIT_THREADSAFE -DENABLE_WALLET -DUSE_UPNP=$(USE_UPNP)
+
+CFLAGS = -mmacosx-version-min=10.13 -arch x86_64 -O2
+CFLAGS += -Wall -Wextra -Wformat -Wno-ignored-qualifiers -Wformat-security -Wno-unused-parameter \
+          -Wunused-function -Wunused-variable -fpermissive -Wconversion-null -Wno-deprecated-declarations \
+          $(DEFS) $(INCLUDEPATHS)
+
+# Библиотеки: Используем статические .a из твоего Boost 1.58
+LIBS = -dead_strip
+LIBS += \
+ /opt/local/lib/db48/libdb_cxx-4.8.dylib \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_thread.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_filesystem.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_program_options.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_chrono.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_system.a \
+ /Users/dns/openssl-1.0.2l/libssl.a \
+ /Users/dns/openssl-1.0.2l/libcrypto.a \
+ /opt/local/lib/libminiupnpc.dylib \
+ /Users/dns/hexlan_project/src/leveldb/libleveldb.a \
+ /Users/dns/hexlan_project/src/leveldb/libmemenv.a \
+ -lz
+
+OBJS= \
+    obj/alert.o \
+    obj/allocators.o \
+    obj/version.o \
+    obj/support/cleanse.o \
+    obj/checkpoints.o \
+    obj/netbase.o \
+    obj/addrman.o \
+    obj/base58.o \
+    obj/crypter.o \
+    obj/key.o \
+    obj/pubkey.o \
+    obj/ecwrapper.o \
+    obj/init.o \
+    obj/bitcoind.o \
+    obj/keystore.o \
+    obj/core.o \
+    obj/main.o \
+    obj/net.o \
+    obj/protocol.o \
+    obj/rpcclient.o \
+    obj/rpcprotocol.o \
+    obj/rpcserver.o \
+    obj/rpcmisc.o \
+    obj/rpcnet.o \
+    obj/rpcblockchain.o \
+    obj/rpcrawtransaction.o \
+    obj/rpcsmessage.o \
+    obj/script.o \
+    obj/scrypt.o \
+    obj/sync.o \
+    obj/txmempool.o \
+    obj/util.o \
+    obj/hash.o \
+    obj/noui.o \
+    obj/kernel.o \
+    obj/pbkdf2.o \
+    obj/chainparams.o \
+    obj/stealth.o \
+    obj/activemasternode.o \
+    obj/darksend.o \
+    obj/darksend-relay.o \
+    obj/instantx.o \
+    obj/masternodeconfig.o \
+    obj/masternodeman.o \
+    obj/masternode.o \
+    obj/masternode-payments.o \
+    obj/rpcdarksend.o \
+    obj/spork.o \
+    obj/crypto/hmac_sha256.o \
+    obj/crypto/hmac_sha512.o \
+    obj/crypto/ripemd160.o \
+    obj/crypto/sha1.o \
+    obj/crypto/sha256.o \
+    obj/crypto/sha512.o \
+    obj/smessage.o \
+    obj/db.o \
+    obj/miner.o \
+    obj/rpcdump.o \
+    obj/rpcmining.o \
+    obj/rpcwallet.o \
+    obj/wallet.o \
+    obj/walletdb.o \
+    obj/txdb-leveldb.o
+
+all: hexland
+
+secp256k1/src/libsecp256k1_la-secp256k1.o:
+	@echo "Building Secp256k1 ..."; cd secp256k1; chmod 755 *; ./autogen.sh; ./configure --enable-module-recovery; make; cd ..;
+
+obj/%.o: %.cpp
+	$(CXX) -c $(CFLAGS) -o $@ $<
+
+obj/%.o: %.c
+	$(C) -c $(CFLAGS) -fpermissive -o $@ $<
+
+hexland: $(OBJS) secp256k1/src/libsecp256k1_la-secp256k1.o
+	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
+
+clean:
+	-rm -f hexland
+	-rm -f obj/*.o
