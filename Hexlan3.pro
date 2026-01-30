@@ -21,35 +21,44 @@ macx {
     QMAKE_APPLE_DEVICE_ARCHS = x86_64
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.13
 
-    # Библиотеки в домашней папке (абсолютные пути)
-    BOOST_INCLUDE_PATH = /Users/dns/boost_1_58_0
-    BOOST_LIB_PATH = /Users/dns/boost_1_58_0/stage/lib
+    # --- MacPorts Configuration (NEW) ---
+    MACPORTS_INCLUDE_PATH = /opt/local/include
+    MACPORTS_LIB_PATH = /opt/local/lib
 
+    # OpenSSL оставляем старый (чтобы не сломать криптографию)
     OPENSSL_INCLUDE_PATH = /Users/dns/openssl-1.0.2l/include
     OPENSSL_LIB_PATH = /Users/dns/openssl-1.0.2l
 
+    # Berkeley DB (из MacPorts)
     BDB_INCLUDE_PATH = /opt/local/include/db48
     BDB_LIB_PATH = /opt/local/lib/db48
 
-    MINIUPNPC_INCLUDE_PATH = /opt/local/include
-    MINIUPNPC_LIB_PATH = /opt/local/lib
-
-    INCLUDEPATH += $$BOOST_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$BDB_INCLUDE_PATH $$MINIUPNPC_INCLUDE_PATH
+    # Include Paths
+    INCLUDEPATH += $$MACPORTS_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$BDB_INCLUDE_PATH
 
     DEFINES += MAC_OSX MSG_NOSIGNAL=0
     LIBS += -framework Foundation -framework ApplicationServices -framework AppKit -framework CoreServices
 
-    LIBS += $$BOOST_LIB_PATH/libboost_thread.a \
-            $$BOOST_LIB_PATH/libboost_filesystem.a \
-            $$BOOST_LIB_PATH/libboost_program_options.a \
-            $$BOOST_LIB_PATH/libboost_chrono.a \
-            $$BOOST_LIB_PATH/libboost_system.a \
-            /Users/dns/openssl-1.0.2l/libssl.a \
-            /Users/dns/openssl-1.0.2l/libcrypto.a \
-            -L$$BDB_LIB_PATH -ldb_cxx-4.8 \
-            -L/opt/local/lib -lz -lminiupnpc -lgmp
+    # --- Libraries Linking ---
+    # OpenSSL (Static - твой старый путь)
+    LIBS += /Users/dns/openssl-1.0.2l/libssl.a \
+            /Users/dns/openssl-1.0.2l/libcrypto.a
 
-    # Божья коровка и паспорт приложения
+    # MacPorts Libraries
+    # Используем -mt версии Boost, так принято в MacPorts
+    LIBS += -L$$MACPORTS_LIB_PATH \
+            -L$$BDB_LIB_PATH \
+            -ldb_cxx-4.8 \
+            -lz \
+            -lminiupnpc \
+            -lgmp \
+            -lboost_system-mt \
+            -lboost_filesystem-mt \
+            -lboost_program_options-mt \
+            -lboost_thread-mt \
+            -lboost_chrono-mt
+
+    # Icon and Info.plist
     ICON = src/qt/res/icons/Hexlan.icns
     QMAKE_INFO_PLIST = share/qt/Info.plist
 }
