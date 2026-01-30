@@ -1,72 +1,53 @@
 # -*- mode: Makefile; -*-
-# Copyright (c) 2011 Bitcoin Developers
-# Distributed under the MIT/X11 software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-# Mac OS X makefile for Hexlan
-# Originally by Laszlo Hanyecz (solar@heliacal.net)
+# Mac OS X makefile for Hexland - Final x86_64 Version
 
 CXX=clang++
 C=clang
-DEPSDIR=/usr/local
 
+# Основные пути: Теперь используем твой собранный Boost 1.58
 INCLUDEPATHS= \
- -I"$(CURDIR)" \
- -I"$(CURDIR)"/obj \
- -I"$(DEPSDIR)/include" \
- -I"$(DEPSDIR)/Cellar/boost/1.59.0/include" \
- -I"$(DEPSDIR)/Cellar/berkeley-db4/4.8.30/include" \
- -I"$(DEPSDIR)/openssl-1.0.1p/include"
+ -I$(HOME)/openssl-1.0.2l/include \
+ -I$(HOME)/boost_1_58_0 \
+ -I/opt/local/include/db48 \
+ -I/opt/local/include \
+ -I$(CURDIR) \
+ -I$(CURDIR)/obj \
+ -I$(CURDIR)/secp256k1/include \
+ -I$(CURDIR)/leveldb/include \
+ -I$(CURDIR)/leveldb/helpers
 
 LIBPATHS= \
- -L"$(DEPSDIR)/lib" \
- -L"$(DEPSDIR)/Cellar/boost/1.59.0/lib" \
- -L"$(DEPSDIR)/Cellar/berkeley-db4/4.8.30/lib" \
- -L"$(DEPSDIR)/openssl-1.0.1p/lib"
+ -L$(HOME)/openssl-1.0.2l \
+ -L$(HOME)/boost_1_58_0/stage/lib \
+ -L/opt/local/lib/db48 \
+ -L/opt/local/lib \
+ -L$(CURDIR)/leveldb
 
 USE_UPNP:=1
 USE_WALLET:=1
-USE_LOWMEM:=0
 
-LIBS= -dead_strip
+DEFS=-DMAC_OSX -DMSG_NOSIGNAL=0 -DBOOST_SPIRIT_THREADSAFE -DENABLE_WALLET -DUSE_UPNP=$(USE_UPNP)
 
-ifdef STATIC
-# Build STATIC if you are redistributing the hexland binary
+CFLAGS = -mmacosx-version-min=10.13 -arch x86_64 -O2
+CFLAGS += -Wall -Wextra -Wformat -Wno-ignored-qualifiers -Wformat-security -Wno-unused-parameter \
+          -Wunused-function -Wunused-variable -fpermissive -Wconversion-null -Wno-deprecated-declarations \
+          $(DEFS) $(INCLUDEPATHS)
+
+# Библиотеки: Используем статические .a из твоего Boost 1.58
+LIBS = -dead_strip
 LIBS += \
- $(DEPSDIR)/lib/db48/libdb_cxx-4.8.a \
- $(DEPSDIR)/lib/libboost_system.a \
- $(DEPSDIR)/lib/libboost_filesystem.a \
- $(DEPSDIR)/lib/libboost_program_options.a \
- $(DEPSDIR)/lib/libboost_thread-mt.a \
- $(DEPSDIR)/lib/libssl.a \
- $(DEPSDIR)/lib/libcrypto.a \
+ /opt/local/lib/db48/libdb_cxx-4.8.dylib \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_thread.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_filesystem.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_program_options.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_chrono.a \
+ $(HOME)/boost_1_58_0/stage/lib/libboost_system.a \
+ /Users/dns/openssl-1.0.2l/libssl.a \
+ /Users/dns/openssl-1.0.2l/libcrypto.a \
+ /opt/local/lib/libminiupnpc.dylib \
+ /Users/dns/hexlan_project/src/leveldb/libleveldb.a \
+ /Users/dns/hexlan_project/src/leveldb/libmemenv.a \
  -lz
-else
-LIBS += \
- -l db_cxx-4.8 \
- -l boost_system \
- -l boost_filesystem \
- -l boost_program_options \
- -l boost_thread-mt \
- -l ssl \
- -l crypto \
- -l z
-endif
-
-DEFS=-DMAC_OSX -DMSG_NOSIGNAL=0 -DBOOST_SPIRIT_THREADSAFE
-
-ifdef RELEASE
-# Compile for maximum compatibility and smallest size.
-# This requires that dependencies are compiled
-# the same way.
-CFLAGS = -mmacosx-version-min=10.8 -arch x86_64 -O3
-else
-DEBUGFLAGS = -g
-endif
-
-# ppc doesn't work because we don't support big-endian
-CFLAGS += -Wall -Wextra -Wformat -Wno-ignored-qualifiers -Wformat-security -Wno-unused-parameter -Wunused-function -Wunused-variable -fpermissive -Wconversion-null -Wno-deprecated-declarations\
-    $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
 
 OBJS= \
     obj/alert.o \
@@ -123,77 +104,30 @@ OBJS= \
     obj/crypto/sha1.o \
     obj/crypto/sha256.o \
     obj/crypto/sha512.o \
-    obj/smessage.o
-
-ifeq (${USE_WALLET}, 1)
-    DEFS += -DENABLE_WALLET
-    OBJS += \
-        obj/db.o \
-        obj/miner.o \
-        obj/rpcdump.o \
-        obj/rpcmining.o \
-        obj/rpcwallet.o \
-        obj/wallet.o \
-        obj/walletdb.o
-endif
-
-ifndef USE_UPNP
-	override USE_UPNP = -
-endif
-ifneq (${USE_UPNP}, -)
-	DEFS += -DUSE_UPNP=$(USE_UPNP)
-ifdef STATIC
-	LIBS += $(DEPSDIR)/lib/libminiupnpc.a
-else
-	LIBS += -lminiupnpc
-endif
-endif
-
-ifeq (${USE_LOWMEM}, 1)
-    DEFS += -DLOWMEM
-endif
+    obj/smessage.o \
+    obj/db.o \
+    obj/miner.o \
+    obj/rpcdump.o \
+    obj/rpcmining.o \
+    obj/rpcwallet.o \
+    obj/wallet.o \
+    obj/walletdb.o \
+    obj/txdb-leveldb.o
 
 all: hexland
 
-# build secp256k1
-DEFS += $(addprefix -I,$(CURDIR)/secp256k1/include)
 secp256k1/src/libsecp256k1_la-secp256k1.o:
 	@echo "Building Secp256k1 ..."; cd secp256k1; chmod 755 *; ./autogen.sh; ./configure --enable-module-recovery; make; cd ..;
-hexland: secp256k1/src/libsecp256k1_la-secp256k1.o
-
-# build leveldb
-LIBS += $(CURDIR)/leveldb/libleveldb.a $(CURDIR)/leveldb/libmemenv.a
-DEFS += $(addprefix -I,$(CURDIR)/leveldb/include)
-DEFS += $(addprefix -I,$(CURDIR)/leveldb/helpers)
-OBJS += obj/txdb-leveldb.o
-leveldb/libleveldb.a:
-	@echo "Building LevelDB ..."; cd leveldb; chmod 755 *; make libleveldb.a libmemenv.a; cd ..
-obj/txdb-leveldb.o: leveldb/libleveldb.a
-
-# auto-generated dependencies:
--include obj/*.P
 
 obj/%.o: %.cpp
-	$(CXX) -c $(CFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
-	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
-	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
-	  rm -f $(@:%.o=%.d)
+	$(CXX) -c $(CFLAGS) -o $@ $<
 
 obj/%.o: %.c
-	$(C) -c $(CFLAGS) -fpermissive -MMD -MF $(@:%.o=%.d) -o $@ $<
-	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
-	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
-	  rm -f $(@:%.o=%.d)
+	$(C) -c $(CFLAGS) -fpermissive -o $@ $<
 
-hexland: $(OBJS:obj/%=obj/%)
+hexland: $(OBJS) secp256k1/src/libsecp256k1_la-secp256k1.o
 	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
 
 clean:
 	-rm -f hexland
 	-rm -f obj/*.o
-	-rm -f obj/*.P
-	-rm -f obj/build.h
-
-FORCE:

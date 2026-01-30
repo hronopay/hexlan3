@@ -1,3 +1,4 @@
+#include <QPainterPath>
 #include "tradingdialog.h"
 #include "ui_tradingdialog.h"
 #include "clientmodel.h"

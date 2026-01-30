@@ -1,3 +1,4 @@
+#include <QPainterPath>
 #include "trafficgraphwidget.h"
 #include "clientmodel.h"
 
