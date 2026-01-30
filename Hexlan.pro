@@ -21,6 +21,7 @@ macx {
     QMAKE_APPLE_DEVICE_ARCHS = x86_64
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.13
 
+    # Библиотеки в домашней папке (абсолютные пути)
     BOOST_INCLUDE_PATH = /Users/dns/boost_1_58_0
     BOOST_LIB_PATH = /Users/dns/boost_1_58_0/stage/lib
 
@@ -48,6 +49,7 @@ macx {
             -L$$BDB_LIB_PATH -ldb_cxx-4.8 \
             -L/opt/local/lib -lz -lminiupnpc -lgmp
 
+    # Божья коровка и паспорт приложения
     ICON = src/qt/res/icons/Hexlan.icns
     QMAKE_INFO_PLIST = share/qt/Info.plist
 }
