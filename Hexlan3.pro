@@ -11,7 +11,7 @@ DEFINES += BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE
 CONFIG += no_include_pwd
 CONFIG += thread
 CONFIG += static
-CONFIG += c++14
+CONFIG += c++17
 #CONFIG += openssl
 
 greaterThan(QT_MAJOR_VERSION, 4) {
@@ -21,7 +21,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 
 macx {
     QMAKE_APPLE_DEVICE_ARCHS = x86_64
-    QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.13
+    #QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.13
 
     # --- ПУТИ К ПАПКАМ ---
     OPENSSL_PATH = /Users/dns/openssl-1.0.2l
