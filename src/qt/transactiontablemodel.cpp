@@ -18,6 +18,8 @@
 #include <QDateTime>
 #include <QDebug>
 
+using namespace boost::placeholders;
+
 // Amount column is right-aligned it contains numbers
 static int column_alignments[] = {
 	    Qt::AlignLeft|Qt::AlignVCenter, /* status */

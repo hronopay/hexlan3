@@ -7,10 +7,12 @@ INCLUDEPATH += src src/json src/qt src/qt/plugins/mrichtexteditor build
 QT += network printsupport
 DEFINES += ENABLE_WALLET
 DEFINES += BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE
+
 CONFIG += no_include_pwd
 CONFIG += thread
 CONFIG += static
-CONFIG += openssl
+CONFIG += c++14
+#CONFIG += openssl
 
 greaterThan(QT_MAJOR_VERSION, 4) {
     QT += widgets
@@ -21,33 +23,36 @@ macx {
     QMAKE_APPLE_DEVICE_ARCHS = x86_64
     QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.13
 
-    # --- MacPorts Configuration (NEW) ---
-    MACPORTS_INCLUDE_PATH = /opt/local/include
-    MACPORTS_LIB_PATH = /opt/local/lib
+    # --- ПУТИ К ПАПКАМ ---
+    OPENSSL_PATH = /Users/dns/openssl-1.0.2l
+    MACPORTS_PATH = /opt/local
 
-    # OpenSSL оставляем старый (чтобы не сломать криптографию)
-    OPENSSL_INCLUDE_PATH = /Users/dns/openssl-1.0.2l/include
-    OPENSSL_LIB_PATH = /Users/dns/openssl-1.0.2l
+    # --- ЯДЕРНЫЕ ФЛАГИ КОМПИЛЯТОРА (HARDCORE COMPILER FLAGS) ---
+    # 1. СИЛОЙ ставим твой OpenSSL на первое место (-I)
+    QMAKE_CXXFLAGS += -I$$OPENSSL_PATH/include
+    QMAKE_CFLAGS   += -I$$OPENSSL_PATH/include
 
-    # Berkeley DB (из MacPorts)
-    BDB_INCLUDE_PATH = /opt/local/include/db48
-    BDB_LIB_PATH = /opt/local/lib/db48
+    # 2. СИЛОЙ включаем старый синтаксис Boost (_1, _2)
+    QMAKE_CXXFLAGS += -DBOOST_BIND_GLOBAL_PLACEHOLDERS
 
-    # Include Paths
-    INCLUDEPATH += $$MACPORTS_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$BDB_INCLUDE_PATH
+    # 3. СИЛОЙ отодвигаем системные заголовки MacPorts в конец очереди (-isystem)
+    QMAKE_CXXFLAGS += -isystem $$MACPORTS_PATH/include
+
+    # Berkeley DB
+    INCLUDEPATH += $$MACPORTS_PATH/include/db48
 
     DEFINES += MAC_OSX MSG_NOSIGNAL=0
     LIBS += -framework Foundation -framework ApplicationServices -framework AppKit -framework CoreServices
 
-    # --- Libraries Linking ---
-    # OpenSSL (Static - твой старый путь)
-    LIBS += /Users/dns/openssl-1.0.2l/libssl.a \
-            /Users/dns/openssl-1.0.2l/libcrypto.a
+    # --- Линковка библиотек (Порядок важен!) ---
 
-    # MacPorts Libraries
-    # Используем -mt версии Boost, так принято в MacPorts
-    LIBS += -L$$MACPORTS_LIB_PATH \
-            -L$$BDB_LIB_PATH \
+    # Сначала OpenSSL статически
+    LIBS += $$OPENSSL_PATH/libssl.a \
+            $$OPENSSL_PATH/libcrypto.a
+
+    # Затем библиотеки из MacPorts
+    LIBS += -L$$MACPORTS_PATH/lib \
+            -L$$MACPORTS_PATH/lib/db48 \
             -ldb_cxx-4.8 \
             -lz \
             -lminiupnpc \
@@ -58,7 +63,6 @@ macx {
             -lboost_thread-mt \
             -lboost_chrono-mt
 
-    # Icon and Info.plist
     ICON = src/qt/res/icons/Hexlan.icns
     QMAKE_INFO_PLIST = share/qt/Info.plist
 }

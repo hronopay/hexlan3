@@ -20,6 +20,8 @@
 #include <QFont>
 #include <QColor>
 
+using namespace boost::placeholders;
+
 Q_DECLARE_METATYPE(std::vector<unsigned char>);
 
 QList<QString> ambiguous; /**< Specifies Ambiguous addresses */

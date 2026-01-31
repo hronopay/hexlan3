@@ -27,6 +27,8 @@
 #include <QSet>
 #include <QTimer>
 
+using namespace boost::placeholders;
+
 using namespace std;
 
 WalletModel::WalletModel(CWallet *wallet, OptionsModel *optionsModel, QObject *parent) :
