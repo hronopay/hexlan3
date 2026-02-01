@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <boost/assign/list_of.hpp>
 #include <openssl/rand.h>
+#include <random>
 
 using namespace std;
 using namespace boost;
@@ -554,8 +555,13 @@ void CDarksendPool::Check()
             }
 
             // shuffle the outputs for improved anonymity
-            std::shuffle ( txNew.vin.begin(),  txNew.vin.end(),  randomizeList);
-            std::shuffle ( txNew.vout.begin(), txNew.vout.end(), randomizeList);
+            // Инициализируем генератор случайных чисел (C++17 style)
+            std::random_device rd;
+            std::mt19937 g(rd());
+
+            // Перемешиваем входы и выходы, используя генератор 'g'
+            std::shuffle(txNew.vin.begin(), txNew.vin.end(), g);
+            std::shuffle(txNew.vout.begin(), txNew.vout.end(), g);
 
 
             LogPrint("darksend", "Transaction 1: %s\n", txNew.ToString());
