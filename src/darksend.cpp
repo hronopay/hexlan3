@@ -554,8 +554,8 @@ void CDarksendPool::Check()
             }
 
             // shuffle the outputs for improved anonymity
-            std::random_shuffle ( txNew.vin.begin(),  txNew.vin.end(),  randomizeList);
-            std::random_shuffle ( txNew.vout.begin(), txNew.vout.end(), randomizeList);
+            std::shuffle ( txNew.vin.begin(),  txNew.vin.end(),  randomizeList);
+            std::shuffle ( txNew.vout.begin(), txNew.vout.end(), randomizeList);
 
 
             LogPrint("darksend", "Transaction 1: %s\n", txNew.ToString());

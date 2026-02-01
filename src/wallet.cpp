@@ -24,6 +24,8 @@
 #include "smessage.h"
 
 #include <boost/algorithm/string/replace.hpp>
+#include <random>
+
 
 using namespace std;
 
@@ -1852,7 +1854,7 @@ bool CWallet::SelectCoinsMinConf(int64_t nTargetValue, unsigned int nSpendTime, 
     vector<pair<int64_t, pair<const CWalletTx*,unsigned int> > > vValue;
     int64_t nTotalLower = 0;
 
-    random_shuffle(vCoins.begin(), vCoins.end(), GetRandInt);
+    std::shuffle(vCoins.begin(), vCoins.end(), std::mt19937(std::random_device()()));
 
     // move denoms down on the list
     sort(vCoins.begin(), vCoins.end(), less_then_denom);
@@ -2075,7 +2077,7 @@ bool CWallet::SelectCoinsByDenominations(int nDenom, int64_t nValueMin, int64_t 
     vector<COutput> vCoins;
     AvailableCoins(vCoins, true, NULL, ONLY_DENOMINATED);
 
-    std::random_shuffle(vCoins.rbegin(), vCoins.rend());
+    std::shuffle(vCoins.rbegin(), vCoins.rend(), std::mt19937(std::random_device()()));
 
     //keep track of each denomination that we have
     bool fFound1000 = false;
@@ -2916,7 +2918,7 @@ bool CWallet::CreateStealthTransaction(CScript scriptPubKey, int64_t nValue, std
     vecSend.push_back(make_pair(scriptP, 0));
 
     // -- shuffle inputs, change output won't mix enough as it must be not fully random for plantext narrations
-    std::random_shuffle(vecSend.begin(), vecSend.end());
+    std::shuffle(vecSend.begin(), vecSend.end(), std::mt19937(std::random_device()()));
 
     int nChangePos;
     std::string strFailReason;
@@ -3895,7 +3897,7 @@ string CWallet::PrepareDarksendDenominate(int minRounds, int maxRounds)
     }
 
     // randomize the output order
-    std::random_shuffle (vOut.begin(), vOut.end());
+    std::shuffle(vOut.begin(), vOut.end(), std::mt19937(std::random_device()()));
 
     // We also do not care about full amount as long as we have right denominations, just pass what we found
     darkSendPool.SendDarksendDenominate(vCoinsResult, vOut, nValueIn - nValueLeft);
