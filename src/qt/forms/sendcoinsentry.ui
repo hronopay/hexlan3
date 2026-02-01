@@ -94,11 +94,6 @@
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="BitcoinAmountField" name="payAmount">
-       <zorder>deleteButton</zorder>
-       <zorder>deleteButton</zorder>
-       <zorder>deleteButton</zorder>
-       <zorder>deleteButton</zorder>
-       <zorder>deleteButton</zorder>
       </widget>
      </item>
      <item>
