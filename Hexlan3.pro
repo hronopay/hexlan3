@@ -131,3 +131,4 @@ unix {
     LIBS += src/leveldb/libleveldb.a src/leveldb/libmemenv.a
     LIBS += src/secp256k1/.libs/libsecp256k1.a
 }
+FORMS += src/qt/plugins/mrichtexteditor/mrichtextedit.ui

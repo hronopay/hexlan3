@@ -390,7 +390,7 @@ void TableViewLastColumnResizingFixer::disconnectViewHeadersSignals()
 void TableViewLastColumnResizingFixer::setViewHeaderResizeMode(int logicalIndex, QHeaderView::ResizeMode resizeMode)
 {
 #if QT_VERSION < 0x050000
-    tableView->horizontalHeader()->setResizeMode(logicalIndex, resizeMode);
+    tableView->horizontalHeader()->setSectionResizeMode(logicalIndex, resizeMode);
 #else
     tableView->horizontalHeader()->setSectionResizeMode(logicalIndex, resizeMode);
 #endif
