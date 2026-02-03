@@ -1,0 +1,128 @@
+# Copyright (c) 2009-2010 Satoshi Nakamoto
+# Distributed under the MIT/X11 software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+# --- НАСТРОЙКИ ПУТЕЙ (ВЫХОДИМ НА УРОВЕНЬ ВВЕРХ) ---
+DEPSDIR = ..
+BOOST_DIR = $(DEPSDIR)/libs
+BUNDLED_DIR = $(DEPSDIR)/bundled_deps
+
+CXX = g++
+# Используем старую версию языка, как в .pro файле
+CXXFLAGS = -O2 -fpermissive -w -pthread -Wall -Wextra -Wno-ignored-qualifiers -Wformat -Wformat-security -Wno-unused-parameter
+
+# --- ПОДКЛЮЧЕНИЕ ЗАГОЛОВКОВ ---
+INCLUDEPATHS = \
+    -I"$(CURDIR)" \
+    -I"$(CURDIR)/obj" \
+    -I"$(BOOST_DIR)" \
+    -I"$(BOOST_DIR)/include" \
+    -I"$(BOOST_DIR)/boost" \
+    -I"$(BUNDLED_DIR)/openssl/include" \
+    -I"$(BUNDLED_DIR)/db48/include" \
+    -I"$(CURDIR)/leveldb/include" \
+    -I"$(CURDIR)/leveldb/helpers" \
+    -I"$(CURDIR)/secp256k1/include"
+
+# --- ПОДКЛЮЧЕНИЕ БИБЛИОТЕК ---
+LIBPATHS = \
+    -L"$(BOOST_DIR)/stage/lib" \
+    -L"$(BOOST_DIR)/lib" \
+    -L"$(BOOST_DIR)" \
+    -L"$(BUNDLED_DIR)/openssl/lib" \
+    -L"$(BUNDLED_DIR)/db48/lib" \
+    -L"$(CURDIR)/leveldb"
+
+# Статические библиотеки
+LIBS = \
+ -Wl,-Bstatic \
+   -lboost_system \
+   -lboost_filesystem \
+   -lboost_program_options \
+   -lboost_thread \
+   -lboost_chrono \
+   -ldb_cxx \
+   -lssl \
+   -lcrypto \
+   -lz \
+ -Wl,-Bdynamic \
+   -lrt -ldl -lpthread
+
+# Опции
+DEFS = -D_MT -D_REENTRANT -D_FILE_OFFSET_BITS=64 -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DENABLE_WALLET
+DEFS += -DUSE_UPNP=0 -DUSE_IPV6=1
+
+# Исходники
+OBJS= \
+    obj/alert.o \
+    obj/version.o \
+    obj/checkpoints.o \
+    obj/netbase.o \
+    obj/addrman.o \
+    obj/crypter.o \
+    obj/key.o \
+    obj/db.o \
+    obj/init.o \
+    obj/keystore.o \
+    obj/miner.o \
+    obj/main.o \
+    obj/net.o \
+    obj/protocol.o \
+    obj/bitcoinrpc.o \
+    obj/rpcdump.o \
+    obj/rpcnet.o \
+    obj/rpcmining.o \
+    obj/rpcwallet.o \
+    obj/rpcblockchain.o \
+    obj/rpcrawtransaction.o \
+    obj/rpcsmessage.o \
+    obj/script.o \
+    obj/sync.o \
+    obj/util.o \
+    obj/wallet.o \
+    obj/walletdb.o \
+    obj/noui.o \
+    obj/kernel.o \
+    obj/pbkdf2.o \
+    obj/scrypt.o \
+    obj/txdb-leveldb.o \
+    obj/chainparams.o \
+    obj/stealth.o \
+    obj/activemasternode.o \
+    obj/darksend.o \
+    obj/darksend-relay.o \
+    obj/instantx.o \
+    obj/masternodeconfig.o \
+    obj/masternodeman.o \
+    obj/masternode.o \
+    obj/masternode-payments.o \
+    obj/rpcdarksend.o \
+    obj/spork.o \
+    obj/crypto/hmac_sha256.o \
+    obj/crypto/hmac_sha512.o \
+    obj/crypto/ripemd160.o \
+    obj/crypto/sha1.o \
+    obj/crypto/sha256.o \
+    obj/crypto/sha512.o \
+    obj/smessage.o
+
+all: hexland
+
+# Сборка LevelDB и Secp256k1 (встроена, чтобы наверняка)
+LIBS += $(CURDIR)/leveldb/libleveldb.a $(CURDIR)/leveldb/libmemenv.a
+LIBS += $(CURDIR)/secp256k1/.libs/libsecp256k1.a
+
+# Правила сборки
+obj/%.o: %.cpp
+	$(CXX) -c $(CXXFLAGS) $(INCLUDEPATHS) $(DEFS) $< -o $@
+
+obj/crypto/%.o: crypto/%.cpp
+	$(CXX) -c $(CXXFLAGS) $(INCLUDEPATHS) $(DEFS) $< -o $@
+
+hexland: $(OBJS:obj/%=obj/%)
+	$(CXX) $(CXXFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
+
+clean:
+	-rm -f hexland
+	-rm -f obj/*.o
+	-rm -f obj/crypto/*.o

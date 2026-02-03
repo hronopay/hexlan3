@@ -1,17 +1,37 @@
+# --- Мусор сборки (НЕ КОММИТИТЬ) ---
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.qm
 
+# Папки сборки
 build/
+dist/
 
-src/leveldb/
+# Сгенерированные файлы Qt
+ui_*.h
+moc_*.cpp
+qrc_*.cpp
+Makefile
+!src/makefile.hexlan_static  # А вот наш самописный мейкфайл - ОСТАВИТЬ!
 
-src/qt/locale/
+# Исполняемые файлы (результат)
+Hexlan-qt
+src/hexland
 
-src/secp256k1/
+# Системный мусор
+.DS_Store
+Thumbs.db
+
+# Временные файлы редакторов
+*.user
+*.swp
 
 *.zip
 
 servers\.txt
 
-Hexlan-qt
-
-src/hexland
 Hexlan3.pro.user

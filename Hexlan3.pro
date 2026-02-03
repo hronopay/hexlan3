@@ -2,25 +2,28 @@ TEMPLATE = app
 TARGET = Hexlan-qt
 VERSION = 2.1.0.3
 
-# --- 1. Основные настройки ---
+# --- ПОРЯДОК В ФАЙЛАХ ---
+# Весь мусор (.o, .moc) полетит в папку build
+OBJECTS_DIR = build
+MOC_DIR = build
+RCC_DIR = build
+UI_DIR = build
+
+# --- ОСНОВНЫЕ НАСТРОЙКИ ---
 INCLUDEPATH += src src/json src/qt src/qt/plugins/mrichtexteditor build
 QT += network printsupport widgets
 DEFINES += ENABLE_WALLET BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE
 CONFIG += no_include_pwd thread static
 
-# --- НАСТРОЙКИ ФУНКЦИЙ ---
-# Включаем QR-коды
+# --- ФУНКЦИОНАЛ ---
 DEFINES += USE_QRCODE
-
-# Отключаем UPnP
 DEFINES += USE_UPNP=0
 DEFINES -= USE_UPNP
 
-# Папки с зависимостями
+# --- ЗАВИСИМОСТИ (LINUX STATIC) ---
 MY_BOOST_DIR = $$PWD/libs
 DEPS_DIR = $$PWD/bundled_deps
 
-# --- 2. Подключаем заголовки (.h) ---
 INCLUDEPATH += $$MY_BOOST_DIR
 INCLUDEPATH += $$MY_BOOST_DIR/include
 INCLUDEPATH += $$MY_BOOST_DIR/boost
@@ -32,7 +35,8 @@ INCLUDEPATH += $$DEPS_DIR/qrencode/include
 INCLUDEPATH += src/leveldb/include src/leveldb/helpers
 INCLUDEPATH += src/secp256k1/include
 
-# --- 3. Файлы проекта (УБРАНЫ ПРОБЛЕМНЫЕ ФАЙЛЫ) ---
+# --- ИСХОДНИКИ ---
+# (Убраны bitcoinrpc.h и другие фантомы)
 HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h \
     src/qt/addresstablemodel.h src/qt/optionsdialog.h src/qt/coincontroldialog.h \
     src/qt/coincontroltreewidget.h src/qt/sendcoinsdialog.h src/qt/addressbookpage.h \
@@ -103,30 +107,27 @@ FORMS += src/qt/forms/coincontroldialog.ui src/qt/forms/sendcoinsdialog.ui \
     src/qt/forms/blockbrowser.ui src/qt/forms/darksendconfig.ui \
     src/qt/forms/addeditadrenalinenode.ui src/qt/forms/qrcodedialog.ui
 
-# --- 4. Линковка ---
-
+# --- ЛИНКОВКА (UNIX) ---
 unix {
     QMAKE_CXXFLAGS += -fpermissive -w
 
-    # Boost (из папки libs)
+    # Boost
     LIBS += -L$$MY_BOOST_DIR/lib -L$$MY_BOOST_DIR/stage/lib -L$$MY_BOOST_DIR
 
-    # OpenSSL и BDB (из папки bundled_deps)
+    # OpenSSL, DB, QR
     LIBS += -L$$DEPS_DIR/openssl/lib
     LIBS += -L$$DEPS_DIR/db48/lib
+    LIBS += $$DEPS_DIR/qrencode/lib/libqrencode.a
 
-    # Сами библиотеки
+    # Статические либы
     LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
     LIBS += -ldb_cxx
     LIBS += -lssl -lcrypto
 
-    # QR Code (теперь берем локальный статический файл)
-    LIBS += $$DEPS_DIR/qrencode/lib/libqrencode.a
-
-    # Системные (стандартные либы Linux, они никуда не денутся)
+    # Системные
     LIBS += -lrt -lpthread -ldl
 
-    # Встроенные
+    # Внутренние
     LIBS += src/leveldb/libleveldb.a src/leveldb/libmemenv.a
     LIBS += src/secp256k1/.libs/libsecp256k1.a
 }
