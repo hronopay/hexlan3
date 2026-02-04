@@ -3,6 +3,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <stdio.h>
 #include "assert.h"
 
 #include "chainparams.h"
@@ -90,14 +91,36 @@ public:
 		genesis.nNonce = 440309;
 
 		hashGenesisBlock = genesis.GetHash();
+
+
+
+
+
+
+
   
+        /*
         LogPrintf("Display genesis hash so we can input it below %s\n", hashGenesisBlock.ToString().c_str());
 	    LogPrintf("Display merkle root so we can input it below %s\n", genesis.hashMerkleRoot.ToString().c_str());
         LogPrintf("Display nonce so we can input it below %s\n", genesis.nNonce);
         LogPrintf("Display time so we can input it below %s\n", genesis.nTime);
+        
 
-		assert(genesis.hashMerkleRoot == uint256("0xf11d48344d8585e31c00c85e7d3d0b19cb0b0a50751d6542fa4d29f8bc5c46fb"));
+
+        printf("Display genesis hash so we can input it below %s\n", hashGenesisBlock.ToString().c_str());
+	    printf("Display merkle root so we can input it below %s\n", genesis.hashMerkleRoot.ToString().c_str());
+        printf("Display nonce so we can input it below %s\n", genesis.nNonce);
+        printf("Display time so we can input it below %s\n", genesis.nTime);
+*/
+
+
+
+
 		assert(hashGenesisBlock == uint256("0x0c9eed44c7b5a7e8691397802764db34dda7628c22d34a7aca31a5d7e00c9a4d"));
+		assert(genesis.hashMerkleRoot == uint256("0xf11d48344d8585e31c00c85e7d3d0b19cb0b0a50751d6542fa4d29f8bc5c46fb"));
+
+
+
 
 		base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 41);
 		base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 100);
@@ -161,7 +184,10 @@ public:
 
         hashGenesisBlock = genesis.GetHash();
 
-        LogPrintf("Display testNet genesis hash so we can input it below %s\n", hashGenesisBlock.ToString().c_str());
+        //  LogPrintf("Display testNet genesis hash so we can input it below %s\n", hashGenesisBlock.ToString().c_str());
+
+        //  printf("Display testNet genesis hash so we can input it below %s\n", hashGenesisBlock.ToString().c_str());
+
 
 		assert(hashGenesisBlock == uint256("0xfa4b8a8a1b3d3acadd91a033ace839fac2754ec7cf3680e42553117c6a0d156d"));
 
