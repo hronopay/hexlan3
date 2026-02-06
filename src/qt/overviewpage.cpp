@@ -444,6 +444,13 @@ void OverviewPage::updateDarksendProgress()
 
 void OverviewPage::darkSendStatus()
 {
+    // === FIX START: Защита от краша при запуске ===
+    // Если кошелек или цепочка блоков не загружены - уходим.
+    // pindexBest - это глобальный указатель, который равен NULL при старте.
+    // Обращение к pindexBest->nHeight роняло программу.
+    if(!pwalletMain || !pindexBest) return;
+    // === FIX END ===
+
     static int64_t nLastDSProgressBlockTime = 0;
 
     int nBestHeight = pindexBest->nHeight;

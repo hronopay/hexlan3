@@ -10,9 +10,15 @@ UI_DIR = build
 
 # --- НАСТРОЙКИ ---
 QT += network printsupport widgets
-# ВАЖНО: Убираем USE_UPNP из определений полностью
+
 DEFINES += ENABLE_WALLET BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE
-DEFINES -= USE_UPNP
+
+# === UPnP ENABLED (STATIC) ===
+DEFINES += USE_UPNP MINIUPNP_STATICLIB
+INCLUDEPATH += $$PWD/bundled_deps/miniupnpc-1.9
+LIBS += $$PWD/bundled_deps/miniupnpc-1.9/libminiupnpc.a
+# =============================
+
 CONFIG += no_include_pwd thread static
 
 # --- ПУТИ (ТВОИ, РАБОЧИЕ) ---
