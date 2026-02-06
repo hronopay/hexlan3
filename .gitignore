@@ -20,6 +20,7 @@ Makefile
 
 # Исполняемые файлы (результат)
 Hexlan-qt
+Hexlan-qt*
 src/hexland
 
 # Системный мусор
