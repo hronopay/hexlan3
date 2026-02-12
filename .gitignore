@@ -37,3 +37,17 @@ servers\.txt
 
 Hexlan3.pro.user
 auto_push.sh
+build_win/
+build_linux/
+release/
+debug/
+Makefile
+Makefile.*
+*.exe
+*.o
+*.a
+Hexlan-qt
+bin.v2/
+*.log
+Makefile*
+*.qmake.stash

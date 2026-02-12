@@ -14,14 +14,29 @@
 #include "allocators.h"
 
 #include <algorithm>
-#include <mutex>
-#include <thread>
+#include <map>
+#include <vector>
+#include <set>
+#include <iostream>
+#include <sstream>
+#include <stdarg.h>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-
+// Boost libraries
+#include <boost/thread.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/foreach.hpp>
+#include <boost/program_options/detail/config_file.hpp>
+#include <boost/program_options/parsers.hpp>
+
+// OpenSSL
+#include <openssl/crypto.h>
+#include <openssl/rand.h>
+#include <openssl/err.h>
 
 // Work around clang compilation problem in Boost 1.46:
 namespace boost {
@@ -30,40 +45,43 @@ namespace boost {
     }
 }
 
-#include <boost/program_options/detail/config_file.hpp>
-#include <boost/program_options/parsers.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/foreach.hpp>
-// #include <boost/thread.hpp> // REMOVED: We use std::thread/mutex now
-#include <openssl/crypto.h>
-#include <openssl/rand.h>
-#include <openssl/err.h>
-#include <stdarg.h>
-
+// ==============================================================================
+// OS SPECIFIC HEADERS
+// ==============================================================================
 #ifdef WIN32
-#ifdef _MSC_VER
-#pragma warning(disable:4786)
-#pragma warning(disable:4804)
-#pragma warning(disable:4805)
-#pragma warning(disable:4717)
-#endif
-#ifdef _WIN32_WINNT
-#undef _WIN32_WINNT
-#endif
-#define _WIN32_WINNT 0x0501
-#ifdef _WIN32_IE
-#undef _WIN32_IE
-#endif
-#define _WIN32_IE 0x0501
-#define WIN32_LEAN_AND_MEAN 1
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <io.h> /* for _commit */
-#include "shlobj.h"
-#elif defined(__linux__)
-# include <sys/prctl.h>
+    #ifdef _MSC_VER
+        #pragma warning(disable:4786)
+        #pragma warning(disable:4804)
+        #pragma warning(disable:4805)
+        #pragma warning(disable:4717)
+    #endif
+    #ifdef _WIN32_WINNT
+        #undef _WIN32_WINNT
+    #endif
+    #define _WIN32_WINNT 0x0501
+    #ifdef _WIN32_IE
+        #undef _WIN32_IE
+    #endif
+    #define _WIN32_IE 0x0501
+    #define WIN32_LEAN_AND_MEAN 1
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <io.h> /* for _commit */
+    #include "shlobj.h"
+#else
+    // LINUX / UNIX / MAC
+    #include <sys/types.h>
+    #include <sys/stat.h>
+    #include <unistd.h>
+    
+    #if defined(__linux__)
+        #include <sys/prctl.h>
+    #endif
+    
+    #if defined(__APPLE__) || defined(MAC_OSX)
+        #include <pthread.h>
+    #endif
 #endif
 
 using namespace std;
@@ -223,11 +241,11 @@ uint256 GetRandHash()
 // maybe indirectly, and you get a core dump at shutdown trying to lock
 // the mutex).
 
-static std::once_flag debugPrintInitFlag;
-// We use std::call_once() to make sure these are initialized in
+static boost::once_flag debugPrintInitFlag;
+// We use boost::call_once() to make sure these are initialized in
 // in a thread-safe manner the first time it is called:
 static FILE* fileout = NULL;
-static std::mutex* mutexDebugLog = NULL;
+static boost::mutex* mutexDebugLog = NULL;
 
 static void DebugPrintInit()
 {
@@ -238,7 +256,7 @@ static void DebugPrintInit()
     fileout = fopen(pathDebug.string().c_str(), "a");
     if (fileout) setbuf(fileout, NULL); // unbuffered
 
-    mutexDebugLog = new std::mutex();
+    mutexDebugLog = new boost::mutex();
 }
 
 bool LogAcceptCategory(const char* category)
@@ -252,17 +270,12 @@ bool LogAcceptCategory(const char* category)
         // This helps prevent issues debugging global destructors,
         // where mapMultiArgs might be deleted before another
         // global destructor calls LogPrint()
-        // C++17 Note: thread_local is the standard replacement for boost::thread_specific_ptr
-        // but for minimal changes we will keep the logic simple or just use static map
-        // For now, let's just ignore the thread-local optimization if it causes issues, 
-        // OR use a static mutex protected set. 
-        // BUT to avoid complex rewrites, we will use a static set which is "good enough" for single user wallets
         
         static std::set<string> setCategories;
         static bool fCategoriesInit = false;
-        static std::mutex mutexCategories;
+        static boost::mutex mutexCategories;
         
-        std::lock_guard<std::mutex> lock(mutexCategories);
+        boost::lock_guard<boost::mutex> lock(mutexCategories);
         if (!fCategoriesInit)
         {
             const vector<string>& categories = mapMultiArgs["-debug"];
@@ -288,12 +301,12 @@ int LogPrintStr(const std::string &str)
     else if (fPrintToDebugLog)
     {
         static bool fStartedNewLine = true;
-        std::call_once(debugPrintInitFlag, &DebugPrintInit);
+        boost::call_once(debugPrintInitFlag, &DebugPrintInit);
 
         if (fileout == NULL)
             return ret;
 
-        std::lock_guard<std::mutex> scoped_lock(*mutexDebugLog);
+        boost::lock_guard<boost::mutex> scoped_lock(*mutexDebugLog);
 
         // reopen the log file, if requested
         if (fReopenDebugLog) {
@@ -674,15 +687,15 @@ vector<unsigned char> DecodeBase64(const char* p, bool* pfInvalid)
                   break;
 
              case 2: // we have 4 bits and get 6, we keep 2
-                 vchRet.push_back((left<<4) | (dec>>2));
-                 left = dec & 3;
-                 mode = 3;
-                 break;
+                  vchRet.push_back((left<<4) | (dec>>2));
+                  left = dec & 3;
+                  mode = 3;
+                  break;
 
              case 3: // we have 2 bits and get 6
-                 vchRet.push_back((left<<6) | dec);
-                 mode = 0;
-                 break;
+                  vchRet.push_back((left<<6) | dec);
+                  mode = 0;
+                  break;
          }
     }
 
@@ -884,37 +897,37 @@ vector<unsigned char> DecodeBase32(const char* p, bool* pfInvalid)
                   break;
 
              case 2: // we have 2 bits and keep 7
-                 left = left << 5 | dec;
-                 mode = 3;
-                 break;
+                  left = left << 5 | dec;
+                  mode = 3;
+                  break;
 
              case 3: // we have 7 bits and keep 4
-                 vchRet.push_back((left<<1) | (dec>>4));
-                 left = dec & 15;
-                 mode = 4;
-                 break;
+                  vchRet.push_back((left<<1) | (dec>>4));
+                  left = dec & 15;
+                  mode = 4;
+                  break;
 
              case 4: // we have 4 bits, and keep 1
-                 vchRet.push_back((left<<4) | (dec>>1));
-                 left = dec & 1;
-                 mode = 5;
-                 break;
+                  vchRet.push_back((left<<4) | (dec>>1));
+                  left = dec & 1;
+                  mode = 5;
+                  break;
 
              case 5: // we have 1 bit, and keep 6
-                 left = left << 5 | dec;
-                 mode = 6;
-                 break;
+                  left = left << 5 | dec;
+                  mode = 6;
+                  break;
 
              case 6: // we have 6 bits, and keep 3
-                 vchRet.push_back((left<<2) | (dec>>3));
-                 left = dec & 7;
-                 mode = 7;
-                 break;
+                  vchRet.push_back((left<<2) | (dec>>3));
+                  left = dec & 7;
+                  mode = 7;
+                  break;
 
              case 7: // we have 3 bits, and keep 0
-                 vchRet.push_back((left<<5) | dec);
-                 mode = 0;
-                 break;
+                  vchRet.push_back((left<<5) | dec);
+                  mode = 0;
+                  break;
          }
     }
 
@@ -925,8 +938,8 @@ vector<unsigned char> DecodeBase32(const char* p, bool* pfInvalid)
                 break;
 
             case 1: // 8n+1 base32 characters processed: impossible
-            case 3: //   +3
-            case 6: //   +6
+            case 3: //    +3
+            case 6: //    +6
                 *pfInvalid = true;
                 break;
 
@@ -1052,10 +1065,10 @@ static std::string FormatException(std::exception* pex, const char* pszThread)
 #endif
     if (pex)
         return strprintf(
-            "EXCEPTION: %s       \n%s       \n%s in %s       \n", typeid(*pex).name(), pex->what(), pszModule, pszThread);
+            "EXCEPTION: %s        \n%s        \n%s in %s        \n", typeid(*pex).name(), pex->what(), pszModule, pszThread);
     else
         return strprintf(
-            "UNKNOWN EXCEPTION       \n%s in %s       \n", pszModule, pszThread);
+            "UNKNOWN EXCEPTION        \n%s in %s        \n", pszModule, pszThread);
 }
 
 void PrintException(std::exception* pex, const char* pszThread)
@@ -1092,7 +1105,7 @@ boost::filesystem::path GetDefaultDataDir()
         pathRet = fs::path("/");
     else
         pathRet = fs::path(pszHome);
-#ifdef MAC_OSX
+#if defined(__APPLE__) || defined(MAC_OSX)
     // Mac
     pathRet /= "Library/Application Support";
     fs::create_directory(pathRet);
@@ -1216,8 +1229,9 @@ bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
 {
 #ifdef WIN32
     return MoveFileExA(src.string().c_str(), dest.string().c_str(),
-                      MOVEFILE_REPLACE_EXISTING);
+                       MOVEFILE_REPLACE_EXISTING);
 #else
+    // Unix: std::rename is POSIX compliant and atomic for the same filesystem
     int rc = std::rename(src.string().c_str(), dest.string().c_str());
     return (rc == 0);
 #endif /* WIN32 */
@@ -1446,19 +1460,9 @@ void RenameThread(const char* name)
 #if defined(PR_SET_NAME)
     // Only the first 15 characters are used (16 - NUL terminator)
     ::prctl(PR_SET_NAME, name, 0, 0, 0);
-#elif 0 && (defined(__FreeBSD__) || defined(__OpenBSD__))
-    // TODO: This is currently disabled because it needs to be verified to work
-    //       on FreeBSD or OpenBSD first. When verified the '0 &&' part can be
-    //       removed.
-    pthread_set_name_np(pthread_self(), name);
-
-#elif defined(MAC_OSX) && defined(__MAC_OS_X_VERSION_MAX_ALLOWED)
-
-// pthread_setname_np is XCode 10.6-and-later
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 1060
+#elif defined(MAC_OSX) || defined(__APPLE__)
+    // pthread_setname_np is XCode 10.6-and-later
     pthread_setname_np(name);
-#endif
-
 #else
     // Prevent warnings for unused parameters...
     (void)name;
