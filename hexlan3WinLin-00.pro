@@ -5,6 +5,7 @@ VERSION = 2.1.0.3
 # --- ОБЩИЕ НАСТРОЙКИ ---
 QT += network printsupport widgets
 CONFIG += static thread release no_include_pwd
+# Отключаем предупреждения глобально
 QMAKE_CXXFLAGS += -w
 
 # --- ОБЩИЕ ОПРЕДЕЛЕНИЯ ---
@@ -21,18 +22,21 @@ DEPENDPATH += src src/json src/qt
 #                                WINDOWS (WIN32)
 # ==============================================================================
 win32 {
-    message(Building for Windows (MXE)...)
+    message(Building for Windows...)
 
+    # --- ПАПКИ СБОРКИ ---
     OBJECTS_DIR = build_win
     MOC_DIR = build_win
     RCC_DIR = build_win
     UI_DIR = build_win
 
+    # --- СПЕЦИФИЧНЫЕ ОПРЕДЕЛЕНИЯ ---
     DEFINES += WIN32 _WIN32 _MINGW WIN32_LEAN_AND_MEAN
 
-    # Пути для Windows (оставляем как было, раз работает)
+    # --- ПУТИ К БИБЛИОТЕКАМ (deps_sources) ---
     DEPS_BASE = $$PWD/deps_sources
 
+    # Boost 1.76.0
     INCLUDEPATH += $$DEPS_BASE/boost_1_76_0
     LIBS += -L$$DEPS_BASE/boost_1_76_0/stage/lib \
             -lboost_system-mt-x64 \
@@ -41,18 +45,23 @@ win32 {
             -lboost_thread-mt-x64 \
             -lboost_chrono-mt-x64
 
+    # Berkeley DB 4.8.30
     INCLUDEPATH += $$DEPS_BASE/db-4.8.30.NC/build_unix
     LIBS += -L$$DEPS_BASE/db-4.8.30.NC/build_unix -ldb_cxx
 
+    # OpenSSL 1.0.2u
     INCLUDEPATH += $$DEPS_BASE/openssl-1.0.2u/include
     LIBS += -L$$DEPS_BASE/openssl-1.0.2u -lssl -lcrypto
 
+    # MiniUPnPc 1.9
     INCLUDEPATH += $$DEPS_BASE/miniupnpc-1.9
     LIBS += -L$$DEPS_BASE/miniupnpc-1.9 -lminiupnpc
 
+    # Qrencode 4.1.1
     INCLUDEPATH += $$DEPS_BASE/qrencode-4.1.1
     LIBS += -L$$DEPS_BASE/qrencode-4.1.1/.libs -lqrencode
 
+    # Системные библиотеки Windows
     LIBS += -lws2_32 -lshlwapi -lmswsock -liphlpapi -lgdi32 -lcrypt32 -lrpcrt4 -luuid -lole32
 }
 
@@ -60,54 +69,50 @@ win32 {
 #                                LINUX (UNIX)
 # ==============================================================================
 unix:!macx {
-    message(Building for Linux Native...)
+    message(Building for Linux...)
 
+    # --- ПАПКИ СБОРКИ ---
     OBJECTS_DIR = build_linux
     MOC_DIR = build_linux
     RCC_DIR = build_linux
     UI_DIR = build_linux
 
+    # --- ФЛАГИ КОМПИЛЯТОРА ---
     QMAKE_CXXFLAGS += -fpermissive
 
-    # --- НАСТРОЙКА ПУТЕЙ (Строго по твоим папкам) ---
-    # Boost лежит в корне в папке libs
+    # --- ПУТИ К БИБЛИОТЕКАМ (libs / bundled_deps) ---
     MY_BOOST_DIR = $$PWD/libs
-    # Остальное в bundled_deps
     DEPS_DIR = $$PWD/bundled_deps
 
-    # 1. BOOST
     INCLUDEPATH += $$MY_BOOST_DIR/include
-    # Добавляем путь к lib, чтобы линковщик нашел -lboost_...
-    LIBS += -L$$MY_BOOST_DIR/lib
-
-    # 2. OPENSSL
+    INCLUDEPATH += $$MY_BOOST_DIR/boost
     INCLUDEPATH += $$DEPS_DIR/openssl/include
-    LIBS += -L$$DEPS_DIR/openssl/lib -lssl -lcrypto
-
-    # 3. BERKELEY DB 4.8
     INCLUDEPATH += $$DEPS_DIR/db48/include
-    LIBS += -L$$DEPS_DIR/db48/lib -ldb_cxx
-
-    # 4. QRENCODE
-    # (Предполагаем папку qrencode внутри bundled_deps, как показал ls)
     INCLUDEPATH += $$DEPS_DIR/qrencode/include
-    # Ссылка прямая на файл архива, так надежнее при статике
-    LIBS += $$DEPS_DIR/qrencode/lib/libqrencode.a
-
-    # 5. MINIUPNPC
     INCLUDEPATH += $$DEPS_DIR/miniupnpc-1.9
-    LIBS += $$DEPS_DIR/miniupnpc-1.9/libminiupnpc.a
 
-    # 6. Линковка библиотек Boost
-    # Если в системе файлы называются просто libboost_system.a, то сработает это:
+    # Boost (линковка)
+    LIBS += -L$$MY_BOOST_DIR/lib -L$$MY_BOOST_DIR/stage/lib -L$$MY_BOOST_DIR
     LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
 
-    # 7. Системные
+    # OpenSSL
+    LIBS += -L$$DEPS_DIR/openssl/lib -lssl -lcrypto
+
+    # Berkeley DB
+    LIBS += -L$$DEPS_DIR/db48/lib -ldb_cxx
+
+    # MiniUPnPc
+    LIBS += $$DEPS_DIR/miniupnpc-1.9/libminiupnpc.a
+
+    # Qrencode
+    LIBS += $$DEPS_DIR/qrencode/lib/libqrencode.a
+
+    # Системные библиотеки Linux
     LIBS += -lrt -lpthread -ldl
 }
 
 # ==============================================================================
-#                        ОБЩИЕ ИСХОДНИКИ (SOURCES/HEADERS)
+#                        ОБЩИЕ ИСХОДНИКИ И РЕСУРСЫ
 # ==============================================================================
 
 HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h src/qt/addresstablemodel.h \
@@ -195,6 +200,7 @@ FORMS += src/qt/forms/coincontroldialog.ui src/qt/forms/sendcoinsdialog.ui \
     src/qt/plugins/mrichtexteditor/mrichtextedit.ui src/qt/forms/qrcodedialog.ui
 
 # --- ВНУТРЕННИЕ СТАТИЧЕСКИЕ БИБЛИОТЕКИ (ОБЩИЕ) ---
+# Используем $$PWD, чтобы путь всегда был абсолютным и верным
 LIBS += $$PWD/src/leveldb/libleveldb.a $$PWD/src/leveldb/libmemenv.a
 LIBS += $$PWD/src/secp256k1/.libs/libsecp256k1.a
 LIBS += -lpthread
