@@ -11,18 +11,63 @@ QMAKE_CXXFLAGS += -w
 DEFINES += ENABLE_WALLET BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE
 DEFINES += USE_UPNP MINIUPNP_STATICLIB STATICLIB
 
-# --- ВНУТРЕННИЕ ПУТИ (ОБЩИЕ) ---
+# --- ВНУТРЕННИЕ ПУТИ (ОБЩИЕ ДЛЯ ВСЕХ) ---
 INCLUDEPATH += src src/json src/qt src/qt/plugins/mrichtexteditor
 INCLUDEPATH += src/secp256k1/include
 INCLUDEPATH += src/leveldb/include src/leveldb/helpers
 DEPENDPATH += src src/json src/qt
 
 # ==============================================================================
+#                                MAC OS X (MACX)
+# ==============================================================================
+macx {
+    message("--- DETECTED MAC OS X ---")
+    CONFIG += c++17
+
+    # Абсолютный путь к нашему "Золотому комплекту"
+    MAC_BASE = /Users/dns/github/Hexlan3/hexlan3/deps/mac_deps
+
+    # СИЛОВОЙ МЕТОД: Внедряем путь как системный.
+    QMAKE_CXXFLAGS += -isystem $$MAC_BASE/include
+    QMAKE_CFLAGS   += -isystem $$MAC_BASE/include
+
+    # Резервные пути для Qt
+    INCLUDEPATH = $$MAC_BASE/include \
+                  $$MAC_BASE/include/miniupnpc \
+                  $$INCLUDEPATH
+
+    # --- ИСПРАВЛЕНИЕ: Добавляем Objective-C++ исходники для UI ---
+    # Это решает ошибку Undefined symbols для MacDockIconHandler и MacNotificationHandler
+    OBJECTIVE_SOURCES += src/qt/macdockiconhandler.mm \
+                         src/qt/macnotificationhandler.mm
+
+    HEADERS += src/qt/macdockiconhandler.h \
+               src/qt/macnotificationhandler.h
+
+    LIBS += -L$$MAC_BASE/lib
+    LIBS += $$MAC_BASE/lib/libboost_system.a \
+            $$MAC_BASE/lib/libboost_filesystem.a \
+            $$MAC_BASE/lib/libboost_program_options.a \
+            $$MAC_BASE/lib/libboost_thread.a \
+            $$MAC_BASE/lib/libboost_chrono.a \
+            $$MAC_BASE/lib/libboost_atomic.a \
+            $$MAC_BASE/lib/libssl.a \
+            $$MAC_BASE/lib/libcrypto.a \
+            $$MAC_BASE/lib/libdb_cxx.a \
+            $$MAC_BASE/lib/libdb.a \
+            $$MAC_BASE/lib/libminiupnpc.a \
+            $$MAC_BASE/lib/libqrencode.a
+
+    LIBS += -framework Foundation -framework AppKit -framework Security -framework Carbon -lz
+    QMAKE_MACOSX_DEPLOYMENT_TARGET = 13.0
+    DEFINES += MAC_OSX
+}
+
+# ==============================================================================
 #                                WINDOWS (WIN32)
 # ==============================================================================
 win32 {
-    message(Building for Windows (MXE)...)
-
+    message("--- DETECTED WINDOWS ---")
     OBJECTS_DIR = build_win
     MOC_DIR = build_win
     RCC_DIR = build_win
@@ -30,10 +75,15 @@ win32 {
 
     DEFINES += WIN32 _WIN32 _MINGW WIN32_LEAN_AND_MEAN
 
-    # Пути для Windows (оставляем как было, раз работает)
+    # Пути для Windows
     DEPS_BASE = $$PWD/deps_sources
 
-    INCLUDEPATH += $$DEPS_BASE/boost_1_76_0
+    INCLUDEPATH += $$DEPS_BASE/boost_1_76_0 \
+                   $$DEPS_BASE/db-4.8.30.NC/build_unix \
+                   $$DEPS_BASE/openssl-1.0.2u/include \
+                   $$DEPS_BASE/miniupnpc-1.9 \
+                   $$DEPS_BASE/qrencode-4.1.1
+
     LIBS += -L$$DEPS_BASE/boost_1_76_0/stage/lib \
             -lboost_system-mt-x64 \
             -lboost_filesystem-mt-x64 \
@@ -41,16 +91,9 @@ win32 {
             -lboost_thread-mt-x64 \
             -lboost_chrono-mt-x64
 
-    INCLUDEPATH += $$DEPS_BASE/db-4.8.30.NC/build_unix
     LIBS += -L$$DEPS_BASE/db-4.8.30.NC/build_unix -ldb_cxx
-
-    INCLUDEPATH += $$DEPS_BASE/openssl-1.0.2u/include
     LIBS += -L$$DEPS_BASE/openssl-1.0.2u -lssl -lcrypto
-
-    INCLUDEPATH += $$DEPS_BASE/miniupnpc-1.9
     LIBS += -L$$DEPS_BASE/miniupnpc-1.9 -lminiupnpc
-
-    INCLUDEPATH += $$DEPS_BASE/qrencode-4.1.1
     LIBS += -L$$DEPS_BASE/qrencode-4.1.1/.libs -lqrencode
 
     LIBS += -lws2_32 -lshlwapi -lmswsock -liphlpapi -lgdi32 -lcrypt32 -lrpcrt4 -luuid -lole32
@@ -59,8 +102,8 @@ win32 {
 # ==============================================================================
 #                                LINUX (UNIX)
 # ==============================================================================
-unix:!macx {
-    message(Building for Linux Native...)
+unix:!macx:!win32 {
+    message("--- DETECTED LINUX ---")
 
     OBJECTS_DIR = build_linux
     MOC_DIR = build_linux
@@ -69,40 +112,25 @@ unix:!macx {
 
     QMAKE_CXXFLAGS += -fpermissive
 
-    # --- НАСТРОЙКА ПУТЕЙ (Строго по твоим папкам) ---
-    # Boost лежит в корне в папке libs
+    # --- НАСТРОЙКА ПУТЕЙ ---
     MY_BOOST_DIR = $$PWD/libs
-    # Остальное в bundled_deps
     DEPS_DIR = $$PWD/bundled_deps
 
-    # 1. BOOST
-    INCLUDEPATH += $$MY_BOOST_DIR/include
-    # Добавляем путь к lib, чтобы линковщик нашел -lboost_...
-    LIBS += -L$$MY_BOOST_DIR/lib
+    INCLUDEPATH += $$MY_BOOST_DIR/include \
+                   $$DEPS_DIR/openssl/include \
+                   $$DEPS_DIR/db48/include \
+                   $$DEPS_DIR/qrencode/include \
+                   $$DEPS_DIR/miniupnpc-1.9
 
-    # 2. OPENSSL
-    INCLUDEPATH += $$DEPS_DIR/openssl/include
+    LIBS += -L$$MY_BOOST_DIR/lib \
+            -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+
     LIBS += -L$$DEPS_DIR/openssl/lib -lssl -lcrypto
-
-    # 3. BERKELEY DB 4.8
-    INCLUDEPATH += $$DEPS_DIR/db48/include
     LIBS += -L$$DEPS_DIR/db48/lib -ldb_cxx
 
-    # 4. QRENCODE
-    # (Предполагаем папку qrencode внутри bundled_deps, как показал ls)
-    INCLUDEPATH += $$DEPS_DIR/qrencode/include
-    # Ссылка прямая на файл архива, так надежнее при статике
     LIBS += $$DEPS_DIR/qrencode/lib/libqrencode.a
-
-    # 5. MINIUPNPC
-    INCLUDEPATH += $$DEPS_DIR/miniupnpc-1.9
     LIBS += $$DEPS_DIR/miniupnpc-1.9/libminiupnpc.a
 
-    # 6. Линковка библиотек Boost
-    # Если в системе файлы называются просто libboost_system.a, то сработает это:
-    LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
-
-    # 7. Системные
     LIBS += -lrt -lpthread -ldl
 }
 
