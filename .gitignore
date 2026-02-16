@@ -1,54 +1,74 @@
-# --- Мусор сборки (НЕ КОММИТИТЬ) ---
-*.o
-*.a
-*.so
-*.dylib
-*.dll
-*.exe
-*.qm
-
-# Папки сборки
+# ===========================
+# ИГНОРИРОВАНИЕ СБОРКИ (BUILD)
+# ===========================
 build/
+build-*/
+build_win/
+build_linux/
 dist/
+release/
+debug/
+bin.v2/
 
-# Сгенерированные файлы Qt
+# ===========================
+# ВРЕМЕННЫЕ ФАЙЛЫ QT & IDE
+# ===========================
+# Настройки пользователя (личные) - НЕ КОММИТИТЬ
+*.pro.user
+*.pro.user*
+*.user
+CMakeLists.txt.user
+
+# Сгенерированные Qt файлы
 ui_*.h
 moc_*.cpp
 qrc_*.cpp
+.qmake.stash
+.qmake.cache
 Makefile
-!src/makefile.hexlan_static  # А вот наш самописный мейкфайл - ОСТАВИТЬ!
+Makefile*
 
-# Исполняемые файлы (результат)
+# Скомпилированные переводы (бинарные)
+*.qm
+
+# ===========================
+# БИНАРНИКИ И РЕЗУЛЬТАТЫ
+# ===========================
 Hexlan-qt
 Hexlan-qt*
 src/hexland
+*.exe
+*.dll
+*.so
+*.dylib
+*.app/
+*.dmg
+*.o
+*.obj
 
-# Системный мусор
+# ===========================
+# БИБЛИОТЕКИ (*.a)
+# ===========================
+# 1. Игнорируем ВСЕ
+*.a
+*.lib
+
+# 2. РАЗРЕШАЕМ (White-list) только наш Золотой комплект
+!deps/**/*.a
+!deps/**/*.lib
+!bundled_deps/**/*.a
+!libs/**/*.a
+
+# ===========================
+# СИСТЕМНЫЙ МУСОР
+# ===========================
 .DS_Store
 Thumbs.db
-
-# Временные файлы редакторов
-*.user
+*.log
 *.swp
-
 *.zip
 
-servers\.txt
-
-Hexlan3.pro.user
-auto_push.sh
-build_win/
-build_linux/
-release/
-debug/
-Makefile
-Makefile.*
-*.exe
-*.o
-*.a
-Hexlan-qt
-bin.v2/
-*.log
-Makefile*
-*.qmake.stash
-*.pro.user
+# ===========================
+# ИСКЛЮЧЕНИЯ
+# ===========================
+!src/makefile.hexlan_static
