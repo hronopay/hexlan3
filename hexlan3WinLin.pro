@@ -66,7 +66,7 @@ macx {
 #                                WINDOWS (WIN32)
 # ==============================================================================
 win32 {
-    message("--- DETECTED WINDOWS ---")
+    message("--- DETECTED WINDOWS (Updated Paths) ---")
     OBJECTS_DIR = build_win
     MOC_DIR = build_win
     RCC_DIR = build_win
@@ -74,15 +74,11 @@ win32 {
 
     DEFINES += WIN32 _WIN32 _MINGW WIN32_LEAN_AND_MEAN
 
-    # Пути для Windows
-    DEPS_BASE = $$PWD/deps_sources
+    # --- НОВЫЙ ПУТЬ: deps/win_deps ---
+    DEPS_BASE = $$PWD/deps/win_deps
 
-    INCLUDEPATH += $$DEPS_BASE/boost_1_76_0 \
-                   $$DEPS_BASE/db-4.8.30.NC/build_unix \
-                   $$DEPS_BASE/openssl-1.0.2u/include \
-                   $$DEPS_BASE/miniupnpc-1.9 \
-                   $$DEPS_BASE/qrencode-4.1.1
-
+    # Boost
+    INCLUDEPATH += $$DEPS_BASE/boost_1_76_0
     LIBS += -L$$DEPS_BASE/boost_1_76_0/stage/lib \
             -lboost_system-mt-x64 \
             -lboost_filesystem-mt-x64 \
@@ -90,11 +86,23 @@ win32 {
             -lboost_thread-mt-x64 \
             -lboost_chrono-mt-x64
 
+    # Berkeley DB
+    INCLUDEPATH += $$DEPS_BASE/db-4.8.30.NC/build_unix
     LIBS += -L$$DEPS_BASE/db-4.8.30.NC/build_unix -ldb_cxx
+
+    # OpenSSL
+    INCLUDEPATH += $$DEPS_BASE/openssl-1.0.2u/include
     LIBS += -L$$DEPS_BASE/openssl-1.0.2u -lssl -lcrypto
+
+    # MiniUPnPc
+    INCLUDEPATH += $$DEPS_BASE/miniupnpc-1.9
     LIBS += -L$$DEPS_BASE/miniupnpc-1.9 -lminiupnpc
+
+    # Qrencode
+    INCLUDEPATH += $$DEPS_BASE/qrencode-4.1.1
     LIBS += -L$$DEPS_BASE/qrencode-4.1.1/.libs -lqrencode
 
+    # Системные библиотеки Windows
     LIBS += -lws2_32 -lshlwapi -lmswsock -liphlpapi -lgdi32 -lcrypt32 -lrpcrt4 -luuid -lole32
 }
 
@@ -155,7 +163,7 @@ HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h src/qt/addresstabl
     src/main.h src/miner.h src/net.h src/ecwrapper.h src/key.h src/pubkey.h \
     src/db.h src/txdb.h src/txmempool.h src/walletdb.h src/script.h src/scrypt.h \
     src/init.h src/mruset.h src/json/json_spirit_writer_template.h \
-    src/json/json_spirit_writer.h src/json/json_spirit_value.h src/json/json_spirit_utils.h \
+    src/json/json_spirit_writer.h src/json/json_spirit_writer.h src/json/json_spirit_value.h src/json/json_spirit_utils.h \
     src/json/json_spirit_stream_reader.h src/json/json_spirit_reader_template.h \
     src/json/json_spirit_reader.h src/json/json_spirit_error_position.h src/json/json_spirit.h \
     src/qt/clientmodel.h src/qt/guiutil.h src/qt/transactionrecord.h src/qt/guiconstants.h \
