@@ -37,7 +37,6 @@ macx {
                   $$INCLUDEPATH
 
     # --- ИСПРАВЛЕНИЕ: Добавляем Objective-C++ исходники для UI ---
-    # Это решает ошибку Undefined symbols для MacDockIconHandler и MacNotificationHandler
     OBJECTIVE_SOURCES += src/qt/macdockiconhandler.mm \
                          src/qt/macnotificationhandler.mm
 
@@ -103,7 +102,7 @@ win32 {
 #                                LINUX (UNIX)
 # ==============================================================================
 unix:!macx:!win32 {
-    message("--- DETECTED LINUX ---")
+    message("--- DETECTED LINUX (New Structure) ---")
 
     OBJECTS_DIR = build_linux
     MOC_DIR = build_linux
@@ -112,25 +111,32 @@ unix:!macx:!win32 {
 
     QMAKE_CXXFLAGS += -fpermissive
 
-    # --- НАСТРОЙКА ПУТЕЙ ---
-    MY_BOOST_DIR = $$PWD/libs
-    DEPS_DIR = $$PWD/bundled_deps
+    # --- НОВЫЕ ПУТИ (deps/lin_deps) ---
+    # Все библиотеки теперь ищем здесь
+    DEPS_LIN = $$PWD/deps/lin_deps
 
-    INCLUDEPATH += $$MY_BOOST_DIR/include \
-                   $$DEPS_DIR/openssl/include \
-                   $$DEPS_DIR/db48/include \
-                   $$DEPS_DIR/qrencode/include \
-                   $$DEPS_DIR/miniupnpc-1.9
+    # 1. BOOST
+    INCLUDEPATH += $$DEPS_LIN/boost/include
+    LIBS += -L$$DEPS_LIN/boost/lib
+    LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
 
-    LIBS += -L$$MY_BOOST_DIR/lib \
-            -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+    # 2. OPENSSL
+    INCLUDEPATH += $$DEPS_LIN/openssl/include
+    LIBS += -L$$DEPS_LIN/openssl/lib -lssl -lcrypto
 
-    LIBS += -L$$DEPS_DIR/openssl/lib -lssl -lcrypto
-    LIBS += -L$$DEPS_DIR/db48/lib -ldb_cxx
+    # 3. BERKELEY DB
+    INCLUDEPATH += $$DEPS_LIN/db48/include
+    LIBS += -L$$DEPS_LIN/db48/lib -ldb_cxx
 
-    LIBS += $$DEPS_DIR/qrencode/lib/libqrencode.a
-    LIBS += $$DEPS_DIR/miniupnpc-1.9/libminiupnpc.a
+    # 4. QRENCODE
+    INCLUDEPATH += $$DEPS_LIN/qrencode/include
+    LIBS += $$DEPS_LIN/qrencode/lib/libqrencode.a
 
+    # 5. MINIUPNPC
+    INCLUDEPATH += $$DEPS_LIN/miniupnpc
+    LIBS += $$DEPS_LIN/miniupnpc/libminiupnpc.a
+
+    # 6. SYSTEM LIBS
     LIBS += -lrt -lpthread -ldl
 }
 

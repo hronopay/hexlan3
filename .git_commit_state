@@ -1,2 +1,2 @@
-some changes in .pro file
+Refactor: Move Linux dependencies to deps/lin_deps and update .pro
 1
