@@ -3,18 +3,28 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 # ==============================================================================
-# НАСТРОЙКИ ПУТЕЙ (ЛОКАЛЬНЫЕ БИБЛИОТЕКИ)
+# НАСТРОЙКИ ПУТЕЙ (НОВАЯ АРХИТЕКТУРА LINUX)
 # ==============================================================================
-DEPS_PATH=$(CURDIR)/../bundled_deps
-LIBS_PATH=$(CURDIR)/../libs
+# Предполагаем, что makefile лежит в src/, а deps в корне проекта
+DEPS_PATH=$(CURDIR)/../deps/lin_deps
 
 # Boost
-BOOST_INCLUDE_PATH=$(LIBS_PATH)/include
-BOOST_LIB_PATH=$(LIBS_PATH)/lib
+BOOST_INCLUDE_PATH=$(DEPS_PATH)/boost/include
+BOOST_LIB_PATH=$(DEPS_PATH)/boost/lib
+
+# Berkeley DB 4.8
+BDB_INCLUDE_PATH=$(DEPS_PATH)/db48/include
+BDB_LIB_PATH=$(DEPS_PATH)/db48/lib
+
+# OpenSSL
+OPENSSL_INCLUDE_PATH=$(DEPS_PATH)/openssl/include
+OPENSSL_LIB_PATH=$(DEPS_PATH)/openssl/lib
 
 # MiniUPnPc
-MINIUPNPC_INCLUDE_PATH=$(DEPS_PATH)/miniupnpc-1.9
-MINIUPNPC_LIB_PATH=$(DEPS_PATH)/miniupnpc-1.9
+# (При копировании мы убрали суффикс версии -1.9, теперь просто miniupnpc)
+MINIUPNPC_INCLUDE_PATH=$(DEPS_PATH)/miniupnpc
+MINIUPNPC_LIB_PATH=$(DEPS_PATH)/miniupnpc
+
 # ==============================================================================
 
 USE_UPNP:=0
@@ -36,10 +46,10 @@ LIBS = $(addprefix -L,$(BOOST_LIB_PATH) $(BDB_LIB_PATH) $(OPENSSL_LIB_PATH))
 LMODE = dynamic
 LMODE2 = dynamic
 ifdef STATIC
-    LMODE = static
-    ifeq (${STATIC}, all)
-        LMODE2 = static
-    endif
+	LMODE = static
+	ifeq (${STATIC}, all)
+	    LMODE2 = static
+	endif
 endif
 
 # Часть 1: Наши библиотеки (Boost, SSL, DB)
@@ -47,7 +57,6 @@ LIBS += \
  -Wl,-B$(LMODE)
 
 # ВАЖНО: --start-group и --end-group решают проблему циклической зависимости
-# между boost_thread, boost_system и другими статическими библиотеками.
 LIBS += \
  -Wl,--start-group \
    -l boost_thread$(BOOST_LIB_SUFFIX) \
@@ -63,17 +72,17 @@ LIBS += \
 
 # Настройка UPnP
 ifndef USE_UPNP
-    override USE_UPNP = -
+	override USE_UPNP = -
 endif
 ifneq (${USE_UPNP}, -)
-    LIBS += -L$(MINIUPNPC_LIB_PATH)
-    DEFS += -I$(MINIUPNPC_INCLUDE_PATH)
-    LIBS += -l miniupnpc
-    DEFS += -DUSE_UPNP=$(USE_UPNP)
+	LIBS += -L$(MINIUPNPC_LIB_PATH)
+	DEFS += -I$(MINIUPNPC_INCLUDE_PATH)
+	LIBS += -l miniupnpc
+	DEFS += -DUSE_UPNP=$(USE_UPNP)
 endif
 
 ifeq (${USE_LOWMEM}, 1)
-    DEFS += -DLOWMEM
+	DEFS += -DLOWMEM
 endif
 
 # Часть 2: Системные библиотеки (Dynamic) - всегда в конце
@@ -85,93 +94,93 @@ LIBS+= \
 
 
 # Hardening flags
-    HARDENING=-fno-stack-protector
-    HARDENING+=-fstack-protector-all -Wstack-protector
-    LDHARDENING+=-Wl,-z,relro -Wl,-z,now
-    ifdef PIE
-        HARDENING+=-fPIE
-        LDHARDENING+=-pie
-    endif
-    HARDENING+=-D_FORTIFY_SOURCE=2
+	HARDENING=-fno-stack-protector
+	HARDENING+=-fstack-protector-all -Wstack-protector
+	LDHARDENING+=-Wl,-z,relro -Wl,-z,now
+	ifdef PIE
+	    HARDENING+=-fPIE
+	    LDHARDENING+=-pie
+	endif
+	HARDENING+=-D_FORTIFY_SOURCE=2
 
 DEBUGFLAGS=-g
 
 ifeq (${ARCH}, i686)
-    EXT_OPTIONS=-msse2
+	EXT_OPTIONS=-msse2
 endif
 
 xCXXFLAGS=-O2 $(EXT_OPTIONS) -pthread -Wall -Wextra -Wno-ignored-qualifiers -Wformat -Wformat-security -Wno-unused-parameter -Wunused-function -Wunused-variable -fpermissive -Wconversion-null\
-    $(DEBUGFLAGS) $(DEFS) $(HARDENING) $(CXXFLAGS)
+	$(DEBUGFLAGS) $(DEFS) $(HARDENING) $(CXXFLAGS)
 
 xLDFLAGS=$(LDHARDENING) $(LDFLAGS)
 
 OBJS= \
-    obj/alert.o \
-    obj/allocators.o \
-    obj/version.o \
-    obj/support/cleanse.o \
-    obj/checkpoints.o \
-    obj/netbase.o \
-    obj/addrman.o \
-    obj/base58.o \
-    obj/crypter.o \
-    obj/key.o \
-    obj/pubkey.o \
-    obj/ecwrapper.o \
-    obj/init.o \
-    obj/bitcoind.o \
-    obj/keystore.o \
-    obj/core.o \
-    obj/main.o \
-    obj/net.o \
-    obj/protocol.o \
-    obj/rpcclient.o \
-    obj/rpcprotocol.o \
-    obj/rpcserver.o \
-    obj/rpcmisc.o \
-    obj/rpcnet.o \
-    obj/rpcblockchain.o \
-    obj/rpcrawtransaction.o \
-    obj/rpcsmessage.o \
-    obj/script.o \
-    obj/scrypt.o \
-    obj/sync.o \
-    obj/txmempool.o \
-    obj/util.o \
-    obj/hash.o \
-    obj/noui.o \
-    obj/kernel.o \
-    obj/pbkdf2.o \
-    obj/chainparams.o \
-    obj/stealth.o \
-    obj/activemasternode.o \
-    obj/darksend.o \
-    obj/darksend-relay.o \
-    obj/instantx.o \
-    obj/masternodeconfig.o \
-    obj/masternodeman.o \
-    obj/masternode.o \
-    obj/masternode-payments.o \
-    obj/rpcdarksend.o \
-    obj/spork.o \
-    obj/crypto/hmac_sha256.o \
-    obj/crypto/hmac_sha512.o \
-    obj/crypto/ripemd160.o \
-    obj/crypto/sha1.o \
-    obj/crypto/sha256.o \
-    obj/crypto/sha512.o \
-    obj/smessage.o
+	obj/alert.o \
+	obj/allocators.o \
+	obj/version.o \
+	obj/support/cleanse.o \
+	obj/checkpoints.o \
+	obj/netbase.o \
+	obj/addrman.o \
+	obj/base58.o \
+	obj/crypter.o \
+	obj/key.o \
+	obj/pubkey.o \
+	obj/ecwrapper.o \
+	obj/init.o \
+	obj/bitcoind.o \
+	obj/keystore.o \
+	obj/core.o \
+	obj/main.o \
+	obj/net.o \
+	obj/protocol.o \
+	obj/rpcclient.o \
+	obj/rpcprotocol.o \
+	obj/rpcserver.o \
+	obj/rpcmisc.o \
+	obj/rpcnet.o \
+	obj/rpcblockchain.o \
+	obj/rpcrawtransaction.o \
+	obj/rpcsmessage.o \
+	obj/script.o \
+	obj/scrypt.o \
+	obj/sync.o \
+	obj/txmempool.o \
+	obj/util.o \
+	obj/hash.o \
+	obj/noui.o \
+	obj/kernel.o \
+	obj/pbkdf2.o \
+	obj/chainparams.o \
+	obj/stealth.o \
+	obj/activemasternode.o \
+	obj/darksend.o \
+	obj/darksend-relay.o \
+	obj/instantx.o \
+	obj/masternodeconfig.o \
+	obj/masternodeman.o \
+	obj/masternode.o \
+	obj/masternode-payments.o \
+	obj/rpcdarksend.o \
+	obj/spork.o \
+	obj/crypto/hmac_sha256.o \
+	obj/crypto/hmac_sha512.o \
+	obj/crypto/ripemd160.o \
+	obj/crypto/sha1.o \
+	obj/crypto/sha256.o \
+	obj/crypto/sha512.o \
+	obj/smessage.o
 
 ifeq (${USE_WALLET}, 1)
-    DEFS += -DENABLE_WALLET
-    OBJS += \
-        obj/db.o \
-        obj/miner.o \
-        obj/rpcdump.o \
-        obj/rpcmining.o \
-        obj/rpcwallet.o \
-        obj/wallet.o \
-        obj/walletdb.o
+	DEFS += -DENABLE_WALLET
+	OBJS += \
+	    obj/db.o \
+	    obj/miner.o \
+	    obj/rpcdump.o \
+	    obj/rpcmining.o \
+	    obj/rpcwallet.o \
+	    obj/wallet.o \
+	    obj/walletdb.o
 endif
 
 all: hexland
