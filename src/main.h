@@ -33,6 +33,9 @@ static const int64_t STAKE_TIMESPAN_SWITCH_TIME =  1508858115;
 static const int64_t STAKE_TIMESPAN_SWITCH_TIME1 = 1509555600; //1 Nov 2017 17:00:00 GMT
 static const int64_t FORK_TIME = 1510059600;  //November 7, 2017 1:00:00 PM GMT
 
+// --- КОСТЫЛЬ ДЛЯ ЗАВИСШЕЙ СЕТИ ---
+static const int64_t STUCK_CHAIN_TIMEOUT = 1200; // 20 минут простоя в секундах
+// ---------------------------------
 
 #define INSTANTX_SIGNATURES_REQUIRED           10
 #define INSTANTX_SIGNATURES_TOTAL              15
@@ -163,7 +166,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle);
 void ThreadImport(std::vector<boost::filesystem::path> vImportFiles);
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
-unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
+unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake, int64_t nNewBlockTime = 0);
 int64_t GetProofOfWorkReward(int nHeight, int64_t nFees);
 int64_t GetProofOfStakeReward(const CBlockIndex* pindexPrev, int64_t nCoinAge, int64_t nFees);
 bool IsInitialBlockDownload();
@@ -571,7 +574,7 @@ public:
 
 
 
-/**  A txdb record that contains the disk location of a transaction and the
+/** A txdb record that contains the disk location of a transaction and the
  * locations of transactions that spend its outputs.  vSpent is really only
  * used as a flag, but having the location is very helpful for debugging.
  */
