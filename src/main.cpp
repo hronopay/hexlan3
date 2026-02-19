@@ -1644,7 +1644,7 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
     return pindex;
 }
 
-unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
+unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake, int64_t nNewBlockTime)
 {
     //return bnTargetLimit.GetCompact();  
     // uncomment above line for easy pow mining blocks (collateral change forinst.), say if PoW rewards are 0 all the time...
@@ -1679,6 +1679,13 @@ unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfS
             return bnTargetLimit.GetCompact(); // last 2 blocks before collateral change
         }
     } // for HEXLAN only for it was collateral change already before this code was added
+
+    // --- STUCK CHAIN DIFFICULTY RESET ---
+    if (nNewBlockTime > 0 && pindexLast->GetBlockTime() > 0 && (nNewBlockTime - pindexLast->GetBlockTime() > STUCK_CHAIN_TIMEOUT)) {
+        LogPrintf("GetNextTargetRequired(): Stuck chain detected! (%d sec). Resetting difficulty.\n", nNewBlockTime - pindexLast->GetBlockTime());
+        return bnTargetLimit.GetCompact();
+    }
+    // ------------------------------------
 
 
 
@@ -3890,7 +3897,7 @@ bool CBlock::AcceptBlock()
         return DoS(50, error("AcceptBlock() : coinstake timestamp violation nTimeBlock=%d nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
 
     // Check proof-of-work or proof-of-stake
-    if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()) && hash != uint256("0x474619e0a58ec88c8e2516f8232064881750e87acac3a416d65b99bd61246968") && hash != uint256("0x4f3dd45d3de3737d60da46cff2d36df0002b97c505cdac6756d2d88561840b63") && hash != uint256("0x274996cec47b3f3e6cd48c8f0b39c32310dd7ddc8328ae37762be956b9031024"))
+    if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake(), GetBlockTime()) && hash != uint256("0x474619e0a58ec88c8e2516f8232064881750e87acac3a416d65b99bd61246968") && hash != uint256("0x4f3dd45d3de3737d60da46cff2d36df0002b97c505cdac6756d2d88561840b63") && hash != uint256("0x274996cec47b3f3e6cd48c8f0b39c32310dd7ddc8328ae37762be956b9031024"))
         return DoS(100, error("AcceptBlock() : incorrect %s", IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
 
     // Check timestamp against prev
