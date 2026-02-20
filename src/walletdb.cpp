@@ -155,6 +155,13 @@ bool CWalletDB::WriteOrderPosNext(int64_t nOrderPosNext)
     return Write(std::string("orderposnext"), nOrderPosNext);
 }
 
+bool CWalletDB::WriteMnemonic(const std::string& mnemonic)
+{
+    nWalletDBUpdated++;
+    return Write(std::string("mnemonic"), mnemonic);
+}
+
+
 bool CWalletDB::WriteDefaultKey(const CPubKey& vchPubKey)
 {
     nWalletDBUpdated++;
@@ -572,7 +579,14 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
 
             pwallet->mapStealthKeyMeta[keyId] = sxKeyMeta;
         }
-        else if (strType == "defaultkey")
+                else if (strType == "mnemonic")
+        {
+            std::string strMnemonic;
+            ssValue >> strMnemonic;
+            pwallet->strMnemonic = strMnemonic.c_str();
+        }
+
+else if (strType == "defaultkey")
         {
             ssValue >> pwallet->vchDefaultKey;
         }

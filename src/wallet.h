@@ -132,6 +132,7 @@ public:
 
     bool fFileBacked;
     bool fWalletUnlockAnonymizeOnly;
+    SecureString strMnemonic;
     std::string strWalletFile;
 
     std::set<int64_t> setKeyPool;
