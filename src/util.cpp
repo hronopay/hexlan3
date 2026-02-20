@@ -1146,6 +1146,14 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
         }
     } else {
         path = GetDefaultDataDir();
+
+        // --- PORTABLE MODE CHECK ---
+        // If portable.dat exists in the current working directory, use it as the data directory
+        boost::filesystem::path portablePath = boost::filesystem::current_path() / "portable.dat";
+        if (boost::filesystem::exists(portablePath)) {
+            path = boost::filesystem::current_path() / ".Hexlan";
+        }
+        // ---------------------------
     }
     if (fNetSpecific)
         path /= Params().DataDir();
