@@ -158,7 +158,7 @@ HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h src/qt/addresstabl
     src/qt/signverifymessagedialog.h src/qt/aboutdialog.h src/qt/editaddressdialog.h \
     src/qt/bitcoinaddressvalidator.h src/alert.h src/allocators.h src/addrman.h \
     src/base58.h src/bignum.h src/chainparams.h src/chainparamsseeds.h src/checkpoints.h \
-    src/compat.h src/coincontrol.h src/sync.h src/util.h src/hash.h src/uint256.h \
+    src/compat.h src/coincontrol.h src/sync.h src/util.h src/bip39.h src/bip39_english.h src/hash.h src/uint256.h \
     src/kernel.h src/pbkdf2.h src/serialize.h src/support/cleanse.h src/core.h \
     src/main.h src/miner.h src/net.h src/ecwrapper.h src/key.h src/pubkey.h \
     src/db.h src/txdb.h src/txmempool.h src/walletdb.h src/script.h src/scrypt.h \
@@ -194,7 +194,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp src/qt/transactiontablemodel
     src/qt/addressbookpage.cpp src/qt/signverifymessagedialog.cpp src/qt/aboutdialog.cpp \
     src/qt/editaddressdialog.cpp src/qt/bitcoinaddressvalidator.cpp src/alert.cpp \
     src/allocators.cpp src/base58.cpp src/chainparams.cpp src/version.cpp src/sync.cpp \
-    src/txmempool.cpp src/util.cpp src/hash.cpp src/netbase.cpp src/ecwrapper.cpp \
+    src/txmempool.cpp src/util.cpp src/bip39.cpp src/hash.cpp src/netbase.cpp src/ecwrapper.cpp \
     src/key.cpp src/pubkey.cpp src/script.cpp src/scrypt.cpp src/core.cpp src/main.cpp \
     src/miner.cpp src/init.cpp src/net.cpp src/checkpoints.cpp src/addrman.cpp src/db.cpp \
     src/walletdb.cpp src/qt/clientmodel.cpp src/qt/guiutil.cpp src/qt/transactionrecord.cpp \
