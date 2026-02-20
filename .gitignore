@@ -18,6 +18,7 @@ bin.v2/
 *.pro.user*
 *.user
 CMakeLists.txt.user
+.git_commit_state
 
 # Сгенерированные Qt файлы
 ui_*.h
