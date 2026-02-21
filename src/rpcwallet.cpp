@@ -13,6 +13,7 @@
 #include "util.h"
 #include "wallet.h"
 #include "walletdb.h"
+#include "bip39.h"
 
 using namespace std;
 using namespace json_spirit;
@@ -2590,5 +2591,61 @@ Value scanforstealthtxns(const Array& params, bool fHelp)
     result.push_back(Pair("result", "Scan complete."));
     result.push_back(Pair("found", std::string(cbuf)));
 
+    return result;
+}
+
+
+Value bip39generate(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "bip39generate\n"
+            "\nGenerates a new BIP39 mnemonic phrase and stores it in the wallet.\n"
+            "WARNING: This will replace your current mnemonic!\n"
+        );
+
+    EnsureWalletIsUnlocked();
+
+    SecureString mnemonic = BIP39::GenerateMnemonic(32);
+
+    pwalletMain->strMnemonic = mnemonic.c_str();
+    pwalletMain->nBip39Counter = 0;
+    walletdb.WriteBip39Counter(0);
+    CWalletDB walletdb(pwalletMain->strWalletFile);
+    if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic to database");
+
+    Object result;
+    result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
+    return result;
+}
+
+Value bip39recover(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "bip39recover \"mnemonic\"\n"
+            "\nSaves a BIP39 mnemonic phrase to the wallet.\n"
+        );
+
+    EnsureWalletIsUnlocked();
+
+    SecureString mnemonic;
+    mnemonic.reserve(256);
+    mnemonic = params[0].get_str().c_str();
+
+    if (!BIP39::CheckMnemonic(mnemonic))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid BIP39 mnemonic phrase");
+
+    pwalletMain->strMnemonic = mnemonic.c_str();
+    pwalletMain->nBip39Counter = 0;
+    walletdb.WriteBip39Counter(0);
+    CWalletDB walletdb(pwalletMain->strWalletFile);
+    if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic to database");
+
+    Object result;
+    result.push_back(Pair("result", "success"));
+    result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
     return result;
 }
