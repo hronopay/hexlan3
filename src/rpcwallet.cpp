@@ -2610,8 +2610,8 @@ Value bip39generate(const Array& params, bool fHelp)
 
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->nBip39Counter = 0;
-    walletdb.WriteBip39Counter(0);
     CWalletDB walletdb(pwalletMain->strWalletFile);
+    walletdb.WriteBip39Counter(0);
     if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
         throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic to database");
 
@@ -2639,8 +2639,8 @@ Value bip39recover(const Array& params, bool fHelp)
 
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->nBip39Counter = 0;
-    walletdb.WriteBip39Counter(0);
     CWalletDB walletdb(pwalletMain->strWalletFile);
+    walletdb.WriteBip39Counter(0);
     if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
         throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic to database");
 
