@@ -155,6 +155,12 @@ bool CWalletDB::WriteOrderPosNext(int64_t nOrderPosNext)
     return Write(std::string("orderposnext"), nOrderPosNext);
 }
 
+bool CWalletDB::WriteMnemonicPassphrase(const std::string& passphrase)
+{
+    nWalletDBUpdated++;
+    return Write(std::string("bip39passphrase"), passphrase);
+}
+
 bool CWalletDB::WriteBip39Counter(int nCounter)
 {
     nWalletDBUpdated++;
@@ -594,6 +600,12 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         else if (strType == "bip39counter")
         {
             ssValue >> pwallet->nBip39Counter;
+        }
+        else if (strType == "bip39passphrase")
+        {
+            std::string strPass;
+            ssValue >> strPass;
+            pwallet->strMnemonicPassphrase = strPass.c_str();
         }
 
 else if (strType == "defaultkey")

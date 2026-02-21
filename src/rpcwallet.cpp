@@ -2649,3 +2649,43 @@ Value bip39recover(const Array& params, bool fHelp)
     result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
     return result;
 }
+
+Value bip39init(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 1)
+        throw runtime_error(
+            "bip39init [\"passphrase\"]\n"
+            "\nInitializes a new HD wallet with a BIP39 mnemonic and optional passphrase.\n"
+            "WARNING: Can only be used on a completely empty wallet!\n"
+        );
+
+    EnsureWalletIsUnlocked();
+
+    if (!pwalletMain->strMnemonic.empty())
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet is already initialized. Cannot run bip39init on a non-empty wallet.");
+
+    SecureString passphrase;
+    if (params.size() == 1)
+        passphrase = params[0].get_str().c_str();
+
+    SecureString mnemonic = BIP39::GenerateMnemonic(32);
+
+    pwalletMain->strMnemonic = mnemonic.c_str();
+    pwalletMain->strMnemonicPassphrase = passphrase.c_str();
+    pwalletMain->nBip39Counter = 0;
+
+    CWalletDB walletdb(pwalletMain->strWalletFile);
+    if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic");
+    if (!walletdb.WriteMnemonicPassphrase(std::string(pwalletMain->strMnemonicPassphrase.c_str())))
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write passphrase");
+    if (!walletdb.WriteBip39Counter(0))
+        throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write counter");
+
+    pwalletMain->TopUpKeyPool();
+
+    Object result;
+    result.push_back(Pair("result", "success"));
+    result.push_back(Pair("mnemonic", std::string(mnemonic.c_str())));
+    return result;
+}
