@@ -2689,3 +2689,19 @@ Value bip39init(const Array& params, bool fHelp)
     result.push_back(Pair("mnemonic", std::string(mnemonic.c_str())));
     return result;
 }
+
+Value bip39dump(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error("bip39dump\nReturns the current BIP39 mnemonic.");
+    
+    EnsureWalletIsUnlocked();
+    if (pwalletMain->strMnemonic.empty())
+        throw JSONRPCError(RPC_WALLET_ERROR, "No mnemonic phrase stored.");
+
+    Object result;
+    result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
+    if (!pwalletMain->strMnemonicPassphrase.empty())
+        result.push_back(Pair("passphrase", std::string(pwalletMain->strMnemonicPassphrase.c_str())));
+    return result;
+}

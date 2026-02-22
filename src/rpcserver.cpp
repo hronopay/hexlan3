@@ -219,6 +219,7 @@ Value stop(const Array& params, bool fHelp)
 extern json_spirit::Value bip39init(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value bip39generate(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value bip39recover(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value bip39dump(const json_spirit::Array& params, bool fHelp);
 
 static const CRPCCommand vRPCCommands[] =
 { //  name                      actor (function)         okSafeMode threadSafe reqWallet
@@ -335,6 +336,7 @@ static const CRPCCommand vRPCCommands[] =
     { "bip39init",              &bip39init,              false,     false,     true },
     { "bip39generate",          &bip39generate,          false,     false,     true },
     { "bip39recover",           &bip39recover,           false,     false,     true },
+    { "bip39dump",              &bip39dump,              false,     false,     true },
 #endif
 };
 
