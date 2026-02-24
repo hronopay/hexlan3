@@ -4070,6 +4070,10 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
             nTargetSize = nSize;
         else if (fLiteMode)
             nTargetSize = max(GetArg("-keypool", 10), (int64_t)0);
+
+    // Hexlan: Если кошелек еще не инициализирован HD-фразой, генерируем только 1 резервный ключ
+    if (strMnemonic.empty())
+        nTargetSize = 1;
         else
             nTargetSize = max(GetArg("-keypool", 100), (int64_t)0);
 
