@@ -4,6 +4,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "wallet.h"
+#include "bip39.h"
+#include "key.h"
 
 #include "base58.h"
 #include "coincontrol.h"
@@ -66,7 +68,34 @@ CPubKey CWallet::GenerateNewKey()
     bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY); // default to compressed public keys if we want 0.6.0 wallets
 
     CKey secret;
-    secret.MakeNewKey(fCompressed);
+
+    if (!strMnemonic.empty()) {
+        std::vector<uint8_t> vchSeed;
+        SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
+        SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
+        BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
+        
+        CExtKey masterKey;
+        masterKey.SetMaster(&vchSeed[0], vchSeed.size());
+
+        // Стандарт деривации BIP44: m / 44' / 0' / 0' / 0 / nBip39Counter
+        // 0x80000000 означает hardened (усиленную) деривацию
+        CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
+        masterKey.Derive(purposeKey, 44 | 0x80000000);
+        purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
+        coinTypeKey.Derive(accountKey, 0 | 0x80000000);
+        accountKey.Derive(changeKey, 0); // Внешние адреса (change = 0)
+        changeKey.Derive(childKey, nBip39Counter);
+
+        secret = childKey.key;
+        
+        // Увеличиваем счетчик выданных адресов и фиксируем его в БД
+        nBip39Counter++;
+        CWalletDB(strWalletFile).WriteBip39Counter(nBip39Counter);
+    } else {
+        // Резервный механизм случайной генерации до ввода сид-фразы
+        secret.MakeNewKey(fCompressed);
+    }
 
     // Compressed public keys were introduced in version 0.6.0
     if (fCompressed)

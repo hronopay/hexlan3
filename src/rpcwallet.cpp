@@ -12,6 +12,8 @@
 #include "netbase.h"
 #include "util.h"
 #include "wallet.h"
+#include <boost/filesystem.hpp>
+#include <boost/lexical_cast.hpp>
 #include "walletdb.h"
 #include "bip39.h"
 
@@ -2595,38 +2597,39 @@ Value scanforstealthtxns(const Array& params, bool fHelp)
 }
 
 
-Value bip39generate(const Array& params, bool fHelp)
+// Настройки BIP39
+const int BIP39_ENTROPY_BYTES = 16; // 16 байт = 128 бит энтропии = 12 слов
+
+json_spirit::Value bip39generate(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw runtime_error(
-            "bip39generate\n"
-            "\nGenerates a new BIP39 mnemonic phrase and stores it in the wallet.\n"
-            "WARNING: This will replace your current mnemonic!\n"
-        );
+        throw std::runtime_error("bip39generate\n\nGenerates a new BIP39 mnemonic phrase and stores it in the wallet.");
 
     EnsureWalletIsUnlocked();
 
-    SecureString mnemonic = BIP39::GenerateMnemonic(32);
+    std::string backupPath = (GetDataDir() / ("wallet_backup_bip39_" + boost::lexical_cast<std::string>(GetTime()) + ".dat")).string();
+    BackupWallet(*pwalletMain, backupPath);
+
+    SecureString mnemonic = BIP39::GenerateMnemonic(BIP39_ENTROPY_BYTES);
 
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->nBip39Counter = 0;
+    
     CWalletDB walletdb(pwalletMain->strWalletFile);
     walletdb.WriteBip39Counter(0);
     if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
         throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic to database");
 
-    Object result;
-    result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
+    json_spirit::Object result;
+    result.push_back(json_spirit::Pair("backup_created", backupPath));
+    result.push_back(json_spirit::Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
     return result;
 }
 
-Value bip39recover(const Array& params, bool fHelp)
+json_spirit::Value bip39recover(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
-        throw runtime_error(
-            "bip39recover \"mnemonic\"\n"
-            "\nSaves a BIP39 mnemonic phrase to the wallet.\n"
-        );
+        throw std::runtime_error("bip39recover \"mnemonic\"\n\nSaves a BIP39 mnemonic phrase to the wallet.");
 
     EnsureWalletIsUnlocked();
 
@@ -2637,27 +2640,31 @@ Value bip39recover(const Array& params, bool fHelp)
     if (!BIP39::CheckMnemonic(mnemonic))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid BIP39 mnemonic phrase");
 
+    std::string backupPath = (GetDataDir() / ("wallet_backup_bip39_" + boost::lexical_cast<std::string>(GetTime()) + ".dat")).string();
+    BackupWallet(*pwalletMain, backupPath);
+
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->nBip39Counter = 0;
+    
     CWalletDB walletdb(pwalletMain->strWalletFile);
     walletdb.WriteBip39Counter(0);
     if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
         throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write mnemonic to database");
 
-    Object result;
-    result.push_back(Pair("result", "success"));
-    result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
+    pwalletMain->setKeyPool.clear(); // Сброс старых случайных ключей
+    pwalletMain->TopUpKeyPool();     // Генерация новых из HD-цепочки
+
+    json_spirit::Object result;
+    result.push_back(json_spirit::Pair("result", "success"));
+    result.push_back(json_spirit::Pair("backup_created", backupPath));
+    result.push_back(json_spirit::Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
     return result;
 }
 
-Value bip39init(const Array& params, bool fHelp)
+json_spirit::Value bip39init(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
-        throw runtime_error(
-            "bip39init [\"passphrase\"]\n"
-            "\nInitializes a new HD wallet with a BIP39 mnemonic and optional passphrase.\n"
-            "WARNING: Can only be used on a completely empty wallet!\n"
-        );
+        throw std::runtime_error("bip39init [\"passphrase\"]\n\nInitializes a new HD wallet with a BIP39 mnemonic.");
 
     EnsureWalletIsUnlocked();
 
@@ -2668,7 +2675,7 @@ Value bip39init(const Array& params, bool fHelp)
     if (params.size() == 1)
         passphrase = params[0].get_str().c_str();
 
-    SecureString mnemonic = BIP39::GenerateMnemonic(32);
+    SecureString mnemonic = BIP39::GenerateMnemonic(BIP39_ENTROPY_BYTES);
 
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->strMnemonicPassphrase = passphrase.c_str();
@@ -2682,26 +2689,28 @@ Value bip39init(const Array& params, bool fHelp)
     if (!walletdb.WriteBip39Counter(0))
         throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write counter");
 
-    pwalletMain->TopUpKeyPool();
+    pwalletMain->setKeyPool.clear(); // Сброс случайных ключей
+    pwalletMain->TopUpKeyPool();     // Генерация HD-пула
 
-    Object result;
-    result.push_back(Pair("result", "success"));
-    result.push_back(Pair("mnemonic", std::string(mnemonic.c_str())));
+    json_spirit::Object result;
+    result.push_back(json_spirit::Pair("result", "success"));
+    result.push_back(json_spirit::Pair("mnemonic", std::string(mnemonic.c_str())));
     return result;
 }
 
-Value bip39dump(const Array& params, bool fHelp)
+json_spirit::Value bip39dump(const json_spirit::Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw runtime_error("bip39dump\nReturns the current BIP39 mnemonic.");
+        throw std::runtime_error("bip39dump\nReturns the current BIP39 mnemonic.");
     
     EnsureWalletIsUnlocked();
     if (pwalletMain->strMnemonic.empty())
         throw JSONRPCError(RPC_WALLET_ERROR, "No mnemonic phrase stored.");
 
-    Object result;
-    result.push_back(Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
+    json_spirit::Object result;
+    result.push_back(json_spirit::Pair("mnemonic", std::string(pwalletMain->strMnemonic.c_str())));
     if (!pwalletMain->strMnemonicPassphrase.empty())
-        result.push_back(Pair("passphrase", std::string(pwalletMain->strMnemonicPassphrase.c_str())));
+        result.push_back(json_spirit::Pair("passphrase", std::string(pwalletMain->strMnemonicPassphrase.c_str())));
     return result;
 }
+
