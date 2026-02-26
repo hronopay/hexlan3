@@ -236,6 +236,8 @@ namespace {
         bool operator()(const CScriptID &id) const { return addr->Set(id); }
         bool operator()(const CNoDestination &no) const { return false; }
         bool operator()(const CStealthAddress &stxAddr) const { return false; }
+        bool operator()(const WitnessV0KeyHash &id) const { return false; }
+        bool operator()(const WitnessV0ScriptHash &id) const { return false; }
     };
     class CBitcoinAddressVisitor : public boost::static_visitor<bool> {
     private:
@@ -247,6 +249,8 @@ namespace {
         bool operator()(const CScriptID &id) const { return addr->Set(id); }
         bool operator()(const CNoDestination &no) const { return false; }
         bool operator()(const CStealthAddress &stxAddr) const { return false; }
+        bool operator()(const WitnessV0KeyHash &id) const { return false; }
+        bool operator()(const WitnessV0ScriptHash &id) const { return false; }
     };
 };
 

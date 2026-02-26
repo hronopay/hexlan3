@@ -191,7 +191,19 @@ public:
  *  * CScriptID: TX_SCRIPTHASH destination
  *  A CTxDestination is the internal data type encoded in a CHexlanAddress
  */
-typedef boost::variant<CNoDestination, CKeyID, CScriptID, CStealthAddress> CTxDestination;
+// Hexlan SegWit Data Structures
+struct WitnessV0KeyHash : public uint160 {
+    WitnessV0KeyHash() : uint160() {}
+    explicit WitnessV0KeyHash(const uint160& hash) : uint160(hash) {}
+    WitnessV0KeyHash(const CKeyID& id) : uint160(id) {}
+};
+
+struct WitnessV0ScriptHash : public uint256 {
+    WitnessV0ScriptHash() : uint256() {}
+    explicit WitnessV0ScriptHash(const uint256& hash) : uint256(hash) {}
+};
+
+typedef boost::variant<CNoDestination, CKeyID, CScriptID, CStealthAddress, WitnessV0KeyHash, WitnessV0ScriptHash> CTxDestination;
 
 const char* GetTxnOutputType(txnouttype t);
 

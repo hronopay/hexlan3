@@ -129,6 +129,24 @@ public:
         obj.push_back(Pair("todo", true));
         return obj;
     }
+
+    Object operator()(const WitnessV0KeyHash& id) const {
+        Object obj;
+        obj.push_back(Pair("isscript", false));
+        obj.push_back(Pair("iswitness", true));
+        obj.push_back(Pair("witness_version", 0));
+        obj.push_back(Pair("witness_program", HexStr(id.begin(), id.end())));
+        return obj;
+    }
+
+    Object operator()(const WitnessV0ScriptHash& id) const {
+        Object obj;
+        obj.push_back(Pair("isscript", true));
+        obj.push_back(Pair("iswitness", true));
+        obj.push_back(Pair("witness_version", 0));
+        obj.push_back(Pair("witness_program", HexStr(id.begin(), id.end())));
+        return obj;
+    }
 };
 #endif
 

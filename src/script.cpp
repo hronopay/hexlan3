@@ -2610,6 +2610,8 @@ public:
             Process(script);
     }
 
+    void operator()(const WitnessV0KeyHash& keyid) { vKeys.push_back(CKeyID(keyid)); }
+    void operator()(const WitnessV0ScriptHash& scriptid) {}
     void operator()(const CStealthAddress &stxAddr) {
         CScript script;
 
@@ -3088,6 +3090,16 @@ public:
         return true;
     }
 
+    bool operator()(const WitnessV0KeyHash& id) const {
+        script->clear();
+        *script << OP_0 << std::vector<unsigned char>(id.begin(), id.end());
+        return true;
+    }
+    bool operator()(const WitnessV0ScriptHash& id) const {
+        script->clear();
+        *script << OP_0 << std::vector<unsigned char>(id.begin(), id.end());
+        return true;
+    }
     bool operator()(const CStealthAddress &stxAddr) const {
         script->clear();
         //*script << OP_HASH160 << scriptID << OP_EQUAL;
