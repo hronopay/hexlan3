@@ -12,6 +12,7 @@
 #include "netbase.h"
 #include "util.h"
 #include "wallet.h"
+#include "segwit_addr.h"
 #include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include "walletdb.h"
@@ -249,6 +250,11 @@ Value getnewaddress(const Array& params, bool fHelp)
 
     pwalletMain->SetAddressBookName(keyID, strAccount);
 
+    if (!pwalletMain->strMnemonic.empty()) {
+        // Заворачиваем ключ в SegWit-структуру и кодируем в Bech32
+        WitnessV0KeyHash witKeyId(keyID);
+        return EncodeDestination(witKeyId);
+    }
     return CHexlanAddress(keyID).ToString();
 }
 

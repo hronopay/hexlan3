@@ -81,7 +81,7 @@ CPubKey CWallet::GenerateNewKey()
         // Стандарт деривации BIP44: m / 44' / 0' / 0' / 0 / nBip39Counter
         // 0x80000000 означает hardened (усиленную) деривацию
         CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
-        masterKey.Derive(purposeKey, 44 | 0x80000000);
+        masterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
         purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
         coinTypeKey.Derive(accountKey, 0 | 0x80000000);
         accountKey.Derive(changeKey, 0); // Внешние адреса (change = 0)
