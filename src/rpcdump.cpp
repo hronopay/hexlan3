@@ -1,3 +1,4 @@
+#include "segwit_addr.h"
 // Copyright (c) 2009-2012 Bitcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -265,7 +266,7 @@ Value importwallet(const Array& params, bool fHelp)
         assert(key.VerifyPubKey(pubkey));
         CKeyID keyid = pubkey.GetID();
         if (pwalletMain->HaveKey(keyid)) {
-            LogPrintf("Skipping import of %s (key already present)\n", CHexlanAddress(keyid).ToString());
+            LogPrintf("Skipping import of %s (key already present)\n", (!pwalletMain->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(keyid)) : CHexlanAddress(keyid).ToString()));
             continue;
         }
         int64_t nTime = DecodeDumpTime(vstr[1]);
@@ -283,7 +284,7 @@ Value importwallet(const Array& params, bool fHelp)
                 fLabel = true;
             }
         }
-        LogPrintf("Importing %s...\n", CHexlanAddress(keyid).ToString());
+        LogPrintf("Importing %s...\n", (!pwalletMain->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(keyid)) : CHexlanAddress(keyid).ToString()));
         if (!pwalletMain->AddKey(key)) {
             fGood = false;
             continue;
@@ -378,7 +379,7 @@ Value dumpwallet(const Array& params, bool fHelp)
     for (std::vector<std::pair<int64_t, CKeyID> >::const_iterator it = vKeyBirth.begin(); it != vKeyBirth.end(); it++) {
         const CKeyID &keyid = it->second;
         std::string strTime = EncodeDumpTime(it->first);
-        std::string strAddr = CHexlanAddress(keyid).ToString();
+        std::string strAddr = (!pwalletMain->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(keyid)) : CHexlanAddress(keyid).ToString());
 
         CKey key;
         if (pwalletMain->GetKey(keyid, key)) {
