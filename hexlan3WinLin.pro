@@ -158,7 +158,7 @@ HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h src/qt/addresstabl
     src/qt/signverifymessagedialog.h src/qt/aboutdialog.h src/qt/editaddressdialog.h \
     src/qt/bitcoinaddressvalidator.h src/alert.h src/allocators.h src/addrman.h \
     src/base58.h src/bignum.h src/chainparams.h src/chainparamsseeds.h src/checkpoints.h \
-    src/compat.h src/coincontrol.h src/sync.h src/util.h src/bip39.h src/bip39_english.h src/hash.h src/uint256.h \
+    src/compat.h src/coincontrol.h src/sync.h src/util.h src/bip39.h src/bech32.h src/segwit_addr.h src/bip39_english.h src/hash.h src/uint256.h \
     src/kernel.h src/pbkdf2.h src/serialize.h src/support/cleanse.h src/core.h \
     src/main.h src/miner.h src/net.h src/ecwrapper.h src/key.h src/pubkey.h \
     src/db.h src/txdb.h src/txmempool.h src/walletdb.h src/script.h src/scrypt.h \
@@ -186,7 +186,8 @@ HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h src/qt/addresstabl
     src/qt/messagepage.h src/qt/messagemodel.h src/qt/sendmessagesdialog.h \
     src/qt/sendmessagesentry.h src/qt/blockbrowser.h \
     src/qt/plugins/mrichtexteditor/mrichtextedit.h src/qt/qvalidatedtextedit.h \
-    src/qt/tradingdialog.h src/qt/qrcodedialog.h
+    src/qt/tradingdialog.h src/qt/qrcodedialog.h \
+    src/qt/bip39dialog.h
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp src/qt/transactiontablemodel.cpp \
     src/qt/addresstablemodel.cpp src/qt/bantablemodel.cpp src/qt/optionsdialog.cpp \
@@ -194,7 +195,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp src/qt/transactiontablemodel
     src/qt/addressbookpage.cpp src/qt/signverifymessagedialog.cpp src/qt/aboutdialog.cpp \
     src/qt/editaddressdialog.cpp src/qt/bitcoinaddressvalidator.cpp src/alert.cpp \
     src/allocators.cpp src/base58.cpp src/chainparams.cpp src/version.cpp src/sync.cpp \
-    src/txmempool.cpp src/util.cpp src/bip39.cpp src/hash.cpp src/netbase.cpp src/ecwrapper.cpp \
+    src/txmempool.cpp src/util.cpp src/bip39.cpp src/bech32.cpp src/segwit_addr.cpp src/hash.cpp src/netbase.cpp src/ecwrapper.cpp \
     src/key.cpp src/pubkey.cpp src/script.cpp src/scrypt.cpp src/core.cpp src/main.cpp \
     src/miner.cpp src/init.cpp src/net.cpp src/checkpoints.cpp src/addrman.cpp src/db.cpp \
     src/walletdb.cpp src/qt/clientmodel.cpp src/qt/guiutil.cpp src/qt/transactionrecord.cpp \
@@ -220,7 +221,8 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp src/qt/transactiontablemodel
     src/qt/messagepage.cpp src/qt/messagemodel.cpp src/qt/sendmessagesdialog.cpp \
     src/qt/sendmessagesentry.cpp src/qt/blockbrowser.cpp src/qt/qvalidatedtextedit.cpp \
     src/qt/plugins/mrichtexteditor/mrichtextedit.cpp src/qt/tradingdialog.cpp \
-    src/rpcsmessage.cpp src/qt/qrcodedialog.cpp src/txdb-leveldb.cpp
+    src/rpcsmessage.cpp src/qt/qrcodedialog.cpp src/txdb-leveldb.cpp \
+    src/qt/bip39dialog.cpp
 
 RESOURCES += src/qt/bitcoin.qrc
 
