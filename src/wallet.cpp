@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "wallet.h"
+#include "segwit_addr.h"
 #include "bip39.h"
 #include "key.h"
 
@@ -3962,34 +3963,48 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
 
 bool CWallet::SetAddressBookName(const CTxDestination& address, const string& strName)
 {
+    CTxDestination dest = address;
+    if (!strMnemonic.empty()) {
+        if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
+            dest = WitnessV0KeyHash(*kid);
+        }
+    }
+
     bool fUpdated = false;
     {
         LOCK(cs_wallet); // mapAddressBook
-        std::map<CTxDestination, std::string>::iterator mi = mapAddressBook.find(address);
+        std::map<CTxDestination, std::string>::iterator mi = mapAddressBook.find(dest);
         fUpdated = mi != mapAddressBook.end();
-        mapAddressBook[address] = strName;
+        mapAddressBook[dest] = strName;
     }
     NotifyAddressBookChanged(this, address, strName, ::IsMine(*this, address) != ISMINE_NO,
                              (fUpdated ? CT_UPDATED : CT_NEW) );
     if (!fFileBacked)
         return false;
-    return CWalletDB(strWalletFile).WriteName(CHexlanAddress(address).ToString(), strName);
+    return CWalletDB(strWalletFile).WriteName(EncodeDestination(dest), strName);
 }
 
 bool CWallet::DelAddressBookName(const CTxDestination& address)
 {
+    CTxDestination dest = address;
+    if (!strMnemonic.empty()) {
+        if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
+            dest = WitnessV0KeyHash(*kid);
+        }
+    }
+
     {
         LOCK(cs_wallet); // mapAddressBook
 
-        mapAddressBook.erase(address);
+        mapAddressBook.erase(dest);
     }
 
     NotifyAddressBookChanged(this, address, "", ::IsMine(*this, address) != ISMINE_NO, CT_DELETED);
 
     if (!fFileBacked)
         return false;
-    CWalletDB(strWalletFile).EraseName(CHexlanAddress(address).ToString());
-    return CWalletDB(strWalletFile).EraseName(CHexlanAddress(address).ToString());
+    CWalletDB(strWalletFile).EraseName(EncodeDestination(dest));
+    return CWalletDB(strWalletFile).EraseName(EncodeDestination(dest));
 }
 
 bool CWallet::GetTransaction(const uint256 &hashTx, CWalletTx& wtx)

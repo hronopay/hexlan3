@@ -17,6 +17,11 @@
 #include "aboutdialog.h"
 #include "clientmodel.h"
 #include "walletmodel.h"
+#include "bip39dialog.h"
+#include "wallet.h"
+#include "walletdb.h"
+#include <QMessageBox>
+
 #include "editaddressdialog.h"
 #include "optionsmodel.h"
 #include "transactiondescdialog.h"
@@ -547,6 +552,53 @@ void BitcoinGUI::setWalletModel(WalletModel *walletModel)
     this->walletModel = walletModel;
     if(walletModel)
     {
+        // --- HEXLAN ADDRESS BOOK RAM UPGRADE ---
+        if (pwalletMain && !pwalletMain->strMnemonic.empty()) {
+            std::map<CTxDestination, std::string> upgradedBook;
+            for (std::map<CTxDestination, std::string>::iterator it = pwalletMain->mapAddressBook.begin(); it != pwalletMain->mapAddressBook.end(); ++it) {
+                CTxDestination dest = it->first;
+                if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
+                    upgradedBook[WitnessV0KeyHash(*kid)] = it->second;
+                } else {
+                    upgradedBook[dest] = it->second;
+                }
+            }
+            pwalletMain->mapAddressBook = upgradedBook;
+        }
+        // ---------------------------------------
+        // --- HEXLAN BIP39 GUI INTERCEPT ---
+        if (pwalletMain && pwalletMain->strMnemonic.empty()) {
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, tr("Wallet Initialization"),
+                tr("No HD seed found.\n\nClick YES to GENERATE a new 12-word phrase.\nClick NO to RECOVER from an existing phrase."),
+                QMessageBox::Yes|QMessageBox::No);
+
+            Bip39Dialog::Mode mode = (reply == QMessageBox::Yes) ? Bip39Dialog::GENERATE : Bip39Dialog::RECOVER;
+            Bip39Dialog bip39Dlg(mode, this);
+
+            if (bip39Dlg.exec() == QDialog::Accepted) {
+                std::string mnemonic = bip39Dlg.getMnemonic().toStdString();
+                std::string passphrase = bip39Dlg.getPassphrase().toStdString();
+
+                pwalletMain->strMnemonic = mnemonic.c_str();
+                pwalletMain->strMnemonicPassphrase = passphrase.c_str();
+                pwalletMain->nBip39Counter = 0;
+
+                {
+                CWalletDB walletdb(pwalletMain->strWalletFile);
+                walletdb.WriteMnemonic(mnemonic);
+                walletdb.WriteMnemonicPassphrase(passphrase);
+                walletdb.WriteBip39Counter(0);
+                } // Lock released here!
+
+                pwalletMain->setKeyPool.clear();
+                pwalletMain->TopUpKeyPool();
+            } else {
+                QMessageBox::critical(this, tr("Initialization Failed"), tr("A mnemonic phrase is strictly required to operate the Hexlan wallet. The application will now exit."));
+                exit(0);
+            }
+        }
+        // ----------------------------------
         // Receive and report messages from wallet thread
         connect(walletModel, SIGNAL(message(QString,QString,bool,unsigned int)), this, SLOT(message(QString,QString,bool,unsigned int)));
         connect(sendCoinsPage, SIGNAL(message(QString,QString,bool,unsigned int)), this, SLOT(message(QString,QString,bool,unsigned int)));

@@ -8,6 +8,7 @@
 #include <QString>
 
 class QTextEdit;
+class QLineEdit;
 class QPushButton;
 class QLabel;
 
@@ -21,6 +22,7 @@ public:
     ~Bip39Dialog();
 
     QString getMnemonic() const;
+    QString getPassphrase() const;
 
 private slots:
     void onOkClicked();
@@ -29,6 +31,7 @@ private slots:
 private:
     Mode dialogMode;
     QTextEdit* textEditMnemonic;
+    QLineEdit* lineEditPassphrase;
     QPushButton* btnOk;
     QPushButton* btnCancel;
     QString mnemonicStr;

@@ -1,3 +1,4 @@
+#include "segwit_addr.h"
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -2494,6 +2495,12 @@ public:
 
 isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
 {
+    // HEXLAN SEGWIT BYPASS
+    if (const WitnessV0KeyHash* hash = boost::get<WitnessV0KeyHash>(&dest)) {
+        CKeyID keyID(*hash);
+        if (keystore.HaveKey(keyID)) return ISMINE_SPENDABLE;
+    }
+    
     CScript script;
     script.SetDestination(dest);
     return IsMine(keystore, script);

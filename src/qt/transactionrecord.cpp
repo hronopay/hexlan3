@@ -1,3 +1,4 @@
+#include "segwit_addr.h"
 #include "transactionrecord.h"
 
 #include "base58.h"
@@ -55,7 +56,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 {
                     // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
-                    sub.address = CHexlanAddress(address).ToString();
+                    sub.address = EncodeDestination(address);
                 }
                 else
                 {
@@ -144,7 +145,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 if (ExtractDestination(wtx.vout[0].scriptPubKey, address))
                 {
                     // Sent to Dash Address
-                    sub.address = CHexlanAddress(address).ToString();
+                    sub.address = EncodeDestination(address);
                 }
                 else
                 {
@@ -199,7 +200,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 {
                     // Sent to Bitcoin Address
                     sub.type = TransactionRecord::SendToAddress;
-                    sub.address = CHexlanAddress(address).ToString();
+                    sub.address = EncodeDestination(address);
                 }
                 else
                 {

@@ -1,3 +1,4 @@
+#include "segwit_addr.h"
 #include "guiutil.h"
 #include "guiconstants.h"
 #include "bitcoinunits.h"
@@ -400,7 +401,7 @@ MessageModel::StatusCode MessageModel::sendMessages(const QList<SendMessagesReci
 
         // Add addresses / update labels that we've sent to to the address book
         std::string strAddress = rcp.address.toStdString();
-        CTxDestination dest = CHexlanAddress(strAddress).Get();
+        CTxDestination dest = DecodeDestination(strAddress);
         std::string strLabel = rcp.label.toStdString();
         {
             LOCK(wallet->cs_wallet);

@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "walletdb.h"
+#include "segwit_addr.h"
 
 #include "base58.h"
 #include "protocol.h"
@@ -387,7 +388,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         {
             string strAddress;
             ssKey >> strAddress;
-            ssValue >> pwallet->mapAddressBook[CHexlanAddress(strAddress).Get()];
+            ssValue >> pwallet->mapAddressBook[DecodeDestination(strAddress)];
         }
         else if (strType == "tx")
         {

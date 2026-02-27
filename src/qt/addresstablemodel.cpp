@@ -1,3 +1,4 @@
+#include "segwit_addr.h"
 #include "addresstablemodel.h"
 
 #include "guiutil.h"
@@ -250,7 +251,7 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
                 wallet->UpdateStealthAddress(strTemp, strValue, false);
             } else
             {
-                wallet->SetAddressBookName(CHexlanAddress(strTemp).Get(), value.toString().toStdString());
+                wallet->SetAddressBookName(DecodeDestination(strTemp), value.toString().toStdString());
             }
             break;
         case Address:
@@ -262,7 +263,7 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
                 return false;
             }
             // Do nothing, if old address == new address
-            if(CHexlanAddress(rec->address.toStdString()) == CHexlanAddress(value.toString().toStdString()))
+            if(EncodeDestination(DecodeDestination(rec->address.toStdString())) == EncodeDestination(DecodeDestination(value.toString().toStdString())))
             {
                 editStatus = NO_CHANGES;
                 return false;
@@ -389,13 +390,13 @@ QString AddressTableModel::addRow(const QString &type, const QString &label, con
             // Check for duplicate addresses
             {
                 LOCK(wallet->cs_wallet);
-                if (wallet->mapAddressBook.count(CHexlanAddress(strAddress).Get()))
+                if (wallet->mapAddressBook.count(DecodeDestination(strAddress)))
                 {
                     editStatus = DUPLICATE_ADDRESS;
                     return QString();
                 };
                 
-                wallet->SetAddressBookName(CHexlanAddress(strAddress).Get(), strLabel);
+                wallet->SetAddressBookName(DecodeDestination(strAddress), strLabel);
             }
         }
     }
@@ -430,11 +431,11 @@ QString AddressTableModel::addRow(const QString &type, const QString &label, con
                 editStatus = KEY_GENERATION_FAILURE;
                 return QString();
             }
-            strAddress = CHexlanAddress(newKey.GetID()).ToString();
+            strAddress = (!wallet->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(newKey.GetID())) : CHexlanAddress(newKey.GetID()).ToString());
             
             {
                 LOCK(wallet->cs_wallet);
-                wallet->SetAddressBookName(CHexlanAddress(strAddress).Get(), strLabel);
+                wallet->SetAddressBookName(DecodeDestination(strAddress), strLabel);
             }
         }
     }

@@ -1,3 +1,4 @@
+#include "segwit_addr.h"
 // Copyright (c) 2011-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -42,6 +43,19 @@ WalletModel::WalletModel(CWallet *wallet, OptionsModel *optionsModel, QObject *p
     fHaveWatchOnly = wallet->HaveWatchOnly();
     fForceCheckBalanceChanged = false;
 
+    // --- HEXLAN EARLY RAM UPGRADE ---
+    if (wallet && !wallet->strMnemonic.empty()) {
+        std::map<CTxDestination, std::string> upgradedBook;
+        for (std::map<CTxDestination, std::string>::iterator it = wallet->mapAddressBook.begin(); it != wallet->mapAddressBook.end(); ++it) {
+            CTxDestination dest = it->first;
+            if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
+                upgradedBook[WitnessV0KeyHash(*kid)] = it->second;
+            } else {
+                upgradedBook[dest] = it->second;
+            }
+        }
+        wallet->mapAddressBook = upgradedBook;
+    }
     addressTableModel = new AddressTableModel(wallet, this);
     transactionTableModel = new TransactionTableModel(wallet, this);
 
@@ -446,7 +460,7 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
             }
 
             CScript scriptPubKey;
-            scriptPubKey.SetDestination(CHexlanAddress(sAddr).Get());
+            scriptPubKey.SetDestination(DecodeDestination(sAddr));
             vecSend.push_back(make_pair(scriptPubKey, rcp.amount));
 
             if (rcp.narration.length() > 0)
@@ -524,7 +538,7 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
     foreach(const SendCoinsRecipient &rcp, recipients)
     {
         std::string strAddress = rcp.address.toStdString();
-        CTxDestination dest = CHexlanAddress(strAddress).Get();
+        CTxDestination dest = DecodeDestination(strAddress);
         std::string strLabel = rcp.label.toStdString();
         {
             LOCK(wallet->cs_wallet);
@@ -660,7 +674,7 @@ static void NotifyAddressBookChanged(WalletModel *walletmodel, CWallet *wallet,
                                   Q_ARG(int, status));
     } else
     {
-    QString strAddress = QString::fromStdString(CHexlanAddress(address).ToString());
+    QString strAddress = QString::fromStdString(EncodeDestination(address));
     QString strLabel = QString::fromStdString(label);
 
     qDebug() << "NotifyAddressBookChanged : " + strAddress + " " + strLabel + " isMine=" + QString::number(isMine) + " status=" + QString::number(status);
@@ -843,7 +857,7 @@ void WalletModel::listCoins(std::map<QString, std::vector<COutput> >& mapCoins) 
         CTxDestination address;
         if(!out.fSpendable || !ExtractDestination(cout.tx->vout[cout.i].scriptPubKey, address))
             continue;
-        mapCoins[QString::fromStdString(CHexlanAddress(address).ToString())].push_back(out);
+        mapCoins[QString::fromStdString(EncodeDestination(address))].push_back(out);
     }
 }
 
