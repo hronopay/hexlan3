@@ -594,19 +594,13 @@ void BitcoinGUI::setWalletModel(WalletModel *walletModel)
                     // HEXLAN: Уничтожаем зомби-адрес, созданный до инициализации BIP39
                     for (std::map<CTxDestination, std::string>::iterator it = pwalletMain->mapAddressBook.begin(); it != pwalletMain->mapAddressBook.end(); ++it) {
                         walletdb.EraseName(CHexlanAddress(it->first).ToString()); // Удаляем из БД
-                        uiInterface.NotifyAddressBookChanged(pwalletMain, it->first, it->second, ::IsMine(*pwalletMain, it->first) != ISMINE_NO, CT_DELETED); // Удаляем из UI
+                        pwalletMain->NotifyAddressBookChanged(pwalletMain, it->first, it->second, ::IsMine(*pwalletMain, it->first) != ISMINE_NO, CT_DELETED); // Удаляем из UI
                     }
                 } // Lock released here!
                 
                 pwalletMain->mapAddressBook.clear(); // Очищаем RAM
                 pwalletMain->setKeyPool.clear();
                 pwalletMain->TopUpKeyPool();
-
-                // Создаем новый правильный дефолтный адрес Native SegWit
-                CPubKey newDefaultKey;
-                if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
-                    pwalletMain->SetAddressBookName(newDefaultKey.GetID(), "");
-                }
             } else {
                 QMessageBox::critical(this, tr("Initialization Failed"), tr("A mnemonic phrase is strictly required to operate the Hexlan wallet. The application will now exit."));
                 exit(0);

@@ -1,0 +1,585 @@
+diff --git a/.git_commit_state b/.git_commit_state
+index 52e8525..f3dbe28 100644
+--- a/.git_commit_state
++++ b/.git_commit_state
+@@ -1,2 +1,2 @@
+-Fix wallet dump to output Bech32 addresses
+-1
++GUI Widgets on start
++2
+diff --git a/src/qt/addresstablemodel.cpp b/src/qt/addresstablemodel.cpp
+index bb84740..38a1b0e 100644
+--- a/src/qt/addresstablemodel.cpp
++++ b/src/qt/addresstablemodel.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ #include "addresstablemodel.h"
+ 
+ #include "guiutil.h"
+@@ -250,7 +251,7 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
+                 wallet->UpdateStealthAddress(strTemp, strValue, false);
+             } else
+             {
+-                wallet->SetAddressBookName(CHexlanAddress(strTemp).Get(), value.toString().toStdString());
++                wallet->SetAddressBookName(DecodeDestination(strTemp), value.toString().toStdString());
+             }
+             break;
+         case Address:
+@@ -262,7 +263,7 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
+                 return false;
+             }
+             // Do nothing, if old address == new address
+-            if(CHexlanAddress(rec->address.toStdString()) == CHexlanAddress(value.toString().toStdString()))
++            if(EncodeDestination(DecodeDestination(rec->address.toStdString())) == EncodeDestination(DecodeDestination(value.toString().toStdString())))
+             {
+                 editStatus = NO_CHANGES;
+                 return false;
+@@ -389,13 +390,13 @@ QString AddressTableModel::addRow(const QString &type, const QString &label, con
+             // Check for duplicate addresses
+             {
+                 LOCK(wallet->cs_wallet);
+-                if (wallet->mapAddressBook.count(CHexlanAddress(strAddress).Get()))
++                if (wallet->mapAddressBook.count(DecodeDestination(strAddress)))
+                 {
+                     editStatus = DUPLICATE_ADDRESS;
+                     return QString();
+                 };
+                 
+-                wallet->SetAddressBookName(CHexlanAddress(strAddress).Get(), strLabel);
++                wallet->SetAddressBookName(DecodeDestination(strAddress), strLabel);
+             }
+         }
+     }
+@@ -430,11 +431,11 @@ QString AddressTableModel::addRow(const QString &type, const QString &label, con
+                 editStatus = KEY_GENERATION_FAILURE;
+                 return QString();
+             }
+-            strAddress = CHexlanAddress(newKey.GetID()).ToString();
++            strAddress = (!wallet->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(newKey.GetID())) : CHexlanAddress(newKey.GetID()).ToString());
+             
+             {
+                 LOCK(wallet->cs_wallet);
+-                wallet->SetAddressBookName(CHexlanAddress(strAddress).Get(), strLabel);
++                wallet->SetAddressBookName(DecodeDestination(strAddress), strLabel);
+             }
+         }
+     }
+diff --git a/src/qt/bip39dialog.cpp b/src/qt/bip39dialog.cpp
+index 2b58157..8a03ce1 100644
+--- a/src/qt/bip39dialog.cpp
++++ b/src/qt/bip39dialog.cpp
+@@ -8,6 +8,7 @@
+ #include <QHBoxLayout>
+ #include <QLabel>
+ #include <QTextEdit>
++#include <QLineEdit>
+ #include <QPushButton>
+ #include <QMessageBox>
+ 
+@@ -15,13 +16,12 @@ Bip39Dialog::Bip39Dialog(Mode mode, QWidget *parent) :
+     QDialog(parent), dialogMode(mode)
+ {
+     setWindowTitle(mode == GENERATE ? tr("Create HD Wallet") : tr("Recover HD Wallet"));
+-    setMinimumSize(450, 250);
++    setMinimumSize(450, 300);
+ 
+     QVBoxLayout* mainLayout = new QVBoxLayout(this);
+ 
+     QLabel* labelExplanation = new QLabel(this);
+     labelExplanation->setWordWrap(true);
+-    
+     QFont fontExplanation = labelExplanation->font();
+     fontExplanation.setPointSize(10);
+     labelExplanation->setFont(fontExplanation);
+@@ -35,6 +35,14 @@ Bip39Dialog::Bip39Dialog(Mode mode, QWidget *parent) :
+     textEditMnemonic->setFont(font);
+     mainLayout->addWidget(textEditMnemonic);
+ 
++    QLabel* labelPassphrase = new QLabel(tr("Optional Passphrase (Salt):"), this);
++    mainLayout->addWidget(labelPassphrase);
++
++    lineEditPassphrase = new QLineEdit(this);
++    lineEditPassphrase->setPlaceholderText(tr("Leave blank for standard wallet (Recommended)"));
++    lineEditPassphrase->setEchoMode(QLineEdit::Normal);
++    mainLayout->addWidget(lineEditPassphrase);
++
+     QHBoxLayout* buttonLayout = new QHBoxLayout();
+     btnOk = new QPushButton(tr("OK"), this);
+     btnCancel = new QPushButton(tr("Cancel"), this);
+@@ -47,12 +55,9 @@ Bip39Dialog::Bip39Dialog(Mode mode, QWidget *parent) :
+     connect(btnCancel, SIGNAL(clicked()), this, SLOT(onCancelClicked()));
+ 
+     if (mode == GENERATE) {
+-        labelExplanation->setText(tr("Please write down your 12-word mnemonic phrase securely.\n\nThis is the ONLY way to recover your funds if you lose your wallet or password. Do not share it with anyone!"));
+-        
+-        // Генерируем 16 байт энтропии (12 слов)
++        labelExplanation->setText(tr("Please write down your 12-word mnemonic phrase securely.\n\nThis is the ONLY way to recover your funds. Do not share it with anyone!"));
+         SecureString mnemonicSec = BIP39::GenerateMnemonic(16);
+         mnemonicStr = QString::fromStdString(std::string(mnemonicSec.begin(), mnemonicSec.end()));
+-        
+         textEditMnemonic->setPlainText(mnemonicStr);
+         textEditMnemonic->setReadOnly(true);
+     } else {
+@@ -61,44 +66,31 @@ Bip39Dialog::Bip39Dialog(Mode mode, QWidget *parent) :
+     }
+ }
+ 
+-Bip39Dialog::~Bip39Dialog()
+-{
+-}
++Bip39Dialog::~Bip39Dialog() {}
+ 
+-QString Bip39Dialog::getMnemonic() const
+-{
+-    return mnemonicStr;
+-}
++QString Bip39Dialog::getMnemonic() const { return mnemonicStr; }
++QString Bip39Dialog::getPassphrase() const { return lineEditPassphrase->text().trimmed(); }
+ 
+ void Bip39Dialog::onOkClicked()
+ {
+     if (dialogMode == RECOVER) {
+         mnemonicStr = textEditMnemonic->toPlainText().trimmed();
+-        
+-        // Заменяем множественные пробелы и переносы строк на один пробел
+         mnemonicStr.replace(QRegExp("\\s+"), " ");
+-        
+         if (mnemonicStr.isEmpty()) {
+             QMessageBox::warning(this, tr("Error"), tr("Mnemonic phrase cannot be empty."));
+             return;
+         }
+-        
+         SecureString secureMnem(mnemonicStr.toStdString().c_str());
+         if (!BIP39::CheckMnemonic(secureMnem)) {
+-            QMessageBox::warning(this, tr("Error"), tr("Invalid mnemonic phrase. Please check your spelling and ensure you have 12 words."));
++            QMessageBox::warning(this, tr("Error"), tr("Invalid mnemonic phrase. Please check your spelling."));
+             return;
+         }
+     } else {
+         QMessageBox::StandardButton reply;
+-        reply = QMessageBox::question(this, tr("Confirm"), tr("Have you securely written down your mnemonic phrase? If you lose it, your funds will be lost forever."), QMessageBox::Yes|QMessageBox::No);
+-        if (reply == QMessageBox::No) {
+-            return;
+-        }
++        reply = QMessageBox::question(this, tr("Confirm"), tr("Have you securely written down your mnemonic phrase?"), QMessageBox::Yes|QMessageBox::No);
++        if (reply == QMessageBox::No) return;
+     }
+     accept();
+ }
+ 
+-void Bip39Dialog::onCancelClicked()
+-{
+-    reject();
+-}
++void Bip39Dialog::onCancelClicked() { reject(); }
+diff --git a/src/qt/bip39dialog.h b/src/qt/bip39dialog.h
+index b01b9e5..59d8cbd 100644
+--- a/src/qt/bip39dialog.h
++++ b/src/qt/bip39dialog.h
+@@ -8,6 +8,7 @@
+ #include <QString>
+ 
+ class QTextEdit;
++class QLineEdit;
+ class QPushButton;
+ class QLabel;
+ 
+@@ -21,6 +22,7 @@ public:
+     ~Bip39Dialog();
+ 
+     QString getMnemonic() const;
++    QString getPassphrase() const;
+ 
+ private slots:
+     void onOkClicked();
+@@ -29,6 +31,7 @@ private slots:
+ private:
+     Mode dialogMode;
+     QTextEdit* textEditMnemonic;
++    QLineEdit* lineEditPassphrase;
+     QPushButton* btnOk;
+     QPushButton* btnCancel;
+     QString mnemonicStr;
+diff --git a/src/qt/bitcoingui.cpp b/src/qt/bitcoingui.cpp
+index 3d5f19c..46bd083 100644
+--- a/src/qt/bitcoingui.cpp
++++ b/src/qt/bitcoingui.cpp
+@@ -1,3 +1,4 @@
++#include "base58.h"
+ /*
+  * Qt4 bitcoin GUI.
+  *
+@@ -17,6 +18,11 @@
+ #include "aboutdialog.h"
+ #include "clientmodel.h"
+ #include "walletmodel.h"
++#include "bip39dialog.h"
++#include "wallet.h"
++#include "walletdb.h"
++#include <QMessageBox>
++
+ #include "editaddressdialog.h"
+ #include "optionsmodel.h"
+ #include "transactiondescdialog.h"
+@@ -547,6 +553,66 @@ void BitcoinGUI::setWalletModel(WalletModel *walletModel)
+     this->walletModel = walletModel;
+     if(walletModel)
+     {
++        // --- HEXLAN ADDRESS BOOK RAM UPGRADE ---
++        if (pwalletMain && !pwalletMain->strMnemonic.empty()) {
++            std::map<CTxDestination, std::string> upgradedBook;
++            for (std::map<CTxDestination, std::string>::iterator it = pwalletMain->mapAddressBook.begin(); it != pwalletMain->mapAddressBook.end(); ++it) {
++                CTxDestination dest = it->first;
++                if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
++                    upgradedBook[WitnessV0KeyHash(*kid)] = it->second;
++                } else {
++                    upgradedBook[dest] = it->second;
++                }
++            }
++            pwalletMain->mapAddressBook = upgradedBook;
++        }
++        // ---------------------------------------
++        // --- HEXLAN BIP39 GUI INTERCEPT ---
++        if (pwalletMain && pwalletMain->strMnemonic.empty()) {
++            QMessageBox::StandardButton reply;
++            reply = QMessageBox::question(this, tr("Wallet Initialization"),
++                tr("No HD seed found.\n\nClick YES to GENERATE a new 12-word phrase.\nClick NO to RECOVER from an existing phrase."),
++                QMessageBox::Yes|QMessageBox::No);
++
++            Bip39Dialog::Mode mode = (reply == QMessageBox::Yes) ? Bip39Dialog::GENERATE : Bip39Dialog::RECOVER;
++            Bip39Dialog bip39Dlg(mode, this);
++
++            if (bip39Dlg.exec() == QDialog::Accepted) {
++                std::string mnemonic = bip39Dlg.getMnemonic().toStdString();
++                std::string passphrase = bip39Dlg.getPassphrase().toStdString();
++
++                pwalletMain->strMnemonic = mnemonic.c_str();
++                pwalletMain->strMnemonicPassphrase = passphrase.c_str();
++                pwalletMain->nBip39Counter = 0;
++
++                {
++                    CWalletDB walletdb(pwalletMain->strWalletFile);
++                    walletdb.WriteMnemonic(mnemonic);
++                    walletdb.WriteMnemonicPassphrase(passphrase);
++                    walletdb.WriteBip39Counter(0);
++                    
++                    // HEXLAN: Уничтожаем зомби-адрес, созданный до инициализации BIP39
++                    for (std::map<CTxDestination, std::string>::iterator it = pwalletMain->mapAddressBook.begin(); it != pwalletMain->mapAddressBook.end(); ++it) {
++                        walletdb.EraseName(CHexlanAddress(it->first).ToString()); // Удаляем из БД
++                        uiInterface.NotifyAddressBookChanged(pwalletMain, it->first, it->second, ::IsMine(*pwalletMain, it->first) != ISMINE_NO, CT_DELETED); // Удаляем из UI
++                    }
++                } // Lock released here!
++                
++                pwalletMain->mapAddressBook.clear(); // Очищаем RAM
++                pwalletMain->setKeyPool.clear();
++                pwalletMain->TopUpKeyPool();
++
++                // Создаем новый правильный дефолтный адрес Native SegWit
++                CPubKey newDefaultKey;
++                if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
++                    pwalletMain->SetAddressBookName(newDefaultKey.GetID(), "");
++                }
++            } else {
++                QMessageBox::critical(this, tr("Initialization Failed"), tr("A mnemonic phrase is strictly required to operate the Hexlan wallet. The application will now exit."));
++                exit(0);
++            }
++        }
++        // ----------------------------------
+         // Receive and report messages from wallet thread
+         connect(walletModel, SIGNAL(message(QString,QString,bool,unsigned int)), this, SLOT(message(QString,QString,bool,unsigned int)));
+         connect(sendCoinsPage, SIGNAL(message(QString,QString,bool,unsigned int)), this, SLOT(message(QString,QString,bool,unsigned int)));
+diff --git a/src/qt/coincontroldialog.cpp b/src/qt/coincontroldialog.cpp
+index 362dbae..a53d65c 100644
+--- a/src/qt/coincontroldialog.cpp
++++ b/src/qt/coincontroldialog.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ #include "coincontroldialog.h"
+ #include "ui_coincontroldialog.h"
+ 
+@@ -749,7 +750,7 @@ void CoinControlDialog::updateView()
+             QString sAddress = "";
+             if(ExtractDestination(out.tx->vout[out.i].scriptPubKey, outputAddress))
+             {
+-                sAddress = QString::fromStdString(CHexlanAddress(outputAddress).ToString());
++                sAddress = QString::fromStdString(EncodeDestination(outputAddress));
+ 
+                 // if listMode or change => show bitcoin address. In tree mode, address is not shown again for direct wallet address outputs
+                 if (!treeMode || (!(sAddress == sWalletAddress)))
+diff --git a/src/qt/messagemodel.cpp b/src/qt/messagemodel.cpp
+index 63eae89..4279111 100644
+--- a/src/qt/messagemodel.cpp
++++ b/src/qt/messagemodel.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ #include "guiutil.h"
+ #include "guiconstants.h"
+ #include "bitcoinunits.h"
+@@ -400,7 +401,7 @@ MessageModel::StatusCode MessageModel::sendMessages(const QList<SendMessagesReci
+ 
+         // Add addresses / update labels that we've sent to to the address book
+         std::string strAddress = rcp.address.toStdString();
+-        CTxDestination dest = CHexlanAddress(strAddress).Get();
++        CTxDestination dest = DecodeDestination(strAddress);
+         std::string strLabel = rcp.label.toStdString();
+         {
+             LOCK(wallet->cs_wallet);
+diff --git a/src/qt/transactiondesc.cpp b/src/qt/transactiondesc.cpp
+index 72823f3..c5714a0 100644
+--- a/src/qt/transactiondesc.cpp
++++ b/src/qt/transactiondesc.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ #include "transactiondesc.h"
+ 
+ #include "bitcoinunits.h"
+@@ -121,9 +122,9 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
+         if (nNet > 0)
+         {
+             // Credit
+-            if (CHexlanAddress(rec->address).IsValid())
++            if (IsValidDestinationString(rec->address))
+             {
+-                CTxDestination address = CHexlanAddress(rec->address).Get();
++                CTxDestination address = DecodeDestination(rec->address);
+                 if (wallet->mapAddressBook.count(address))
+                 {
+                     strHTML += "<b>" + tr("From") + ":</b> " + tr("unknown") + "<br>";
+@@ -148,7 +149,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
+         // Online transaction
+         std::string strAddress = wtx.mapValue["to"];
+         strHTML += "<b>" + tr("To") + ":</b> ";
+-        CTxDestination dest = CHexlanAddress(strAddress).Get();
++        CTxDestination dest = DecodeDestination(strAddress);
+         if (wallet->mapAddressBook.count(dest) && !wallet->mapAddressBook[dest].empty())
+             strHTML += GUIUtil::HtmlEscape(wallet->mapAddressBook[dest]) + " ";
+         strHTML += GUIUtil::HtmlEscape(strAddress) + "<br>";
+@@ -219,7 +220,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
+                         strHTML += "<b>" + tr("To") + ":</b> ";
+                         if (wallet->mapAddressBook.count(address) && !wallet->mapAddressBook[address].empty())
+                             strHTML += GUIUtil::HtmlEscape(wallet->mapAddressBook[address]) + " ";
+-                        strHTML += GUIUtil::HtmlEscape(CHexlanAddress(address).ToString());
++                        strHTML += GUIUtil::HtmlEscape(EncodeDestination(address));
+                         if(toSelf == ISMINE_SPENDABLE)
+                             strHTML += " (own address)";
+                         else if(toSelf == ISMINE_WATCH_ONLY)
+@@ -315,7 +316,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
+                     {
+                         if (wallet->mapAddressBook.count(address) && !wallet->mapAddressBook[address].empty())
+                             strHTML += GUIUtil::HtmlEscape(wallet->mapAddressBook[address]) + " ";
+-                        strHTML += QString::fromStdString(CHexlanAddress(address).ToString());
++                        strHTML += QString::fromStdString(EncodeDestination(address));
+                     }
+                     strHTML = strHTML + " " + tr("Amount") + "=" + BitcoinUnits::formatWithUnit(unit, vout.nValue);
+                     strHTML = strHTML + " IsMine=" + (wallet->IsMine(vout) & ISMINE_SPENDABLE ? tr("true") : tr("false"));
+diff --git a/src/qt/transactionrecord.cpp b/src/qt/transactionrecord.cpp
+index 50d6772..b0d554a 100644
+--- a/src/qt/transactionrecord.cpp
++++ b/src/qt/transactionrecord.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ #include "transactionrecord.h"
+ 
+ #include "base58.h"
+@@ -55,7 +56,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
+                 {
+                     // Received by Bitcoin Address
+                     sub.type = TransactionRecord::RecvWithAddress;
+-                    sub.address = CHexlanAddress(address).ToString();
++                    sub.address = EncodeDestination(address);
+                 }
+                 else
+                 {
+@@ -144,7 +145,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
+                 if (ExtractDestination(wtx.vout[0].scriptPubKey, address))
+                 {
+                     // Sent to Dash Address
+-                    sub.address = CHexlanAddress(address).ToString();
++                    sub.address = EncodeDestination(address);
+                 }
+                 else
+                 {
+@@ -199,7 +200,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
+                 {
+                     // Sent to Bitcoin Address
+                     sub.type = TransactionRecord::SendToAddress;
+-                    sub.address = CHexlanAddress(address).ToString();
++                    sub.address = EncodeDestination(address);
+                 }
+                 else
+                 {
+diff --git a/src/qt/walletmodel.cpp b/src/qt/walletmodel.cpp
+index d112e65..67c9d17 100644
+--- a/src/qt/walletmodel.cpp
++++ b/src/qt/walletmodel.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ // Copyright (c) 2011-2014 The Bitcoin developers
+ // Copyright (c) 2014-2015 The Dash developers
+ // Distributed under the MIT/X11 software license, see the accompanying
+@@ -42,6 +43,19 @@ WalletModel::WalletModel(CWallet *wallet, OptionsModel *optionsModel, QObject *p
+     fHaveWatchOnly = wallet->HaveWatchOnly();
+     fForceCheckBalanceChanged = false;
+ 
++    // --- HEXLAN EARLY RAM UPGRADE ---
++    if (wallet && !wallet->strMnemonic.empty()) {
++        std::map<CTxDestination, std::string> upgradedBook;
++        for (std::map<CTxDestination, std::string>::iterator it = wallet->mapAddressBook.begin(); it != wallet->mapAddressBook.end(); ++it) {
++            CTxDestination dest = it->first;
++            if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
++                upgradedBook[WitnessV0KeyHash(*kid)] = it->second;
++            } else {
++                upgradedBook[dest] = it->second;
++            }
++        }
++        wallet->mapAddressBook = upgradedBook;
++    }
+     addressTableModel = new AddressTableModel(wallet, this);
+     transactionTableModel = new TransactionTableModel(wallet, this);
+ 
+@@ -446,7 +460,7 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
+             }
+ 
+             CScript scriptPubKey;
+-            scriptPubKey.SetDestination(CHexlanAddress(sAddr).Get());
++            scriptPubKey.SetDestination(DecodeDestination(sAddr));
+             vecSend.push_back(make_pair(scriptPubKey, rcp.amount));
+ 
+             if (rcp.narration.length() > 0)
+@@ -524,7 +538,7 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(WalletModelTransaction &tran
+     foreach(const SendCoinsRecipient &rcp, recipients)
+     {
+         std::string strAddress = rcp.address.toStdString();
+-        CTxDestination dest = CHexlanAddress(strAddress).Get();
++        CTxDestination dest = DecodeDestination(strAddress);
+         std::string strLabel = rcp.label.toStdString();
+         {
+             LOCK(wallet->cs_wallet);
+@@ -660,7 +674,7 @@ static void NotifyAddressBookChanged(WalletModel *walletmodel, CWallet *wallet,
+                                   Q_ARG(int, status));
+     } else
+     {
+-    QString strAddress = QString::fromStdString(CHexlanAddress(address).ToString());
++    QString strAddress = QString::fromStdString(EncodeDestination(address));
+     QString strLabel = QString::fromStdString(label);
+ 
+     qDebug() << "NotifyAddressBookChanged : " + strAddress + " " + strLabel + " isMine=" + QString::number(isMine) + " status=" + QString::number(status);
+@@ -843,7 +857,7 @@ void WalletModel::listCoins(std::map<QString, std::vector<COutput> >& mapCoins)
+         CTxDestination address;
+         if(!out.fSpendable || !ExtractDestination(cout.tx->vout[cout.i].scriptPubKey, address))
+             continue;
+-        mapCoins[QString::fromStdString(CHexlanAddress(address).ToString())].push_back(out);
++        mapCoins[QString::fromStdString(EncodeDestination(address))].push_back(out);
+     }
+ }
+ 
+diff --git a/src/script.cpp b/src/script.cpp
+index ac87c11..7520b66 100644
+--- a/src/script.cpp
++++ b/src/script.cpp
+@@ -1,3 +1,4 @@
++#include "segwit_addr.h"
+ // Copyright (c) 2009-2010 Satoshi Nakamoto
+ // Copyright (c) 2009-2012 The Bitcoin developers
+ // Distributed under the MIT/X11 software license, see the accompanying
+@@ -2494,6 +2495,12 @@ public:
+ 
+ isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
+ {
++    // HEXLAN SEGWIT BYPASS
++    if (const WitnessV0KeyHash* hash = boost::get<WitnessV0KeyHash>(&dest)) {
++        CKeyID keyID(*hash);
++        if (keystore.HaveKey(keyID)) return ISMINE_SPENDABLE;
++    }
++    
+     CScript script;
+     script.SetDestination(dest);
+     return IsMine(keystore, script);
+diff --git a/src/wallet.cpp b/src/wallet.cpp
+index 4d5368c..46c59bc 100644
+--- a/src/wallet.cpp
++++ b/src/wallet.cpp
+@@ -4,6 +4,7 @@
+ // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+ 
+ #include "wallet.h"
++#include "segwit_addr.h"
+ #include "bip39.h"
+ #include "key.h"
+ 
+@@ -3962,34 +3963,48 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
+ 
+ bool CWallet::SetAddressBookName(const CTxDestination& address, const string& strName)
+ {
++    CTxDestination dest = address;
++    if (!strMnemonic.empty()) {
++        if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
++            dest = WitnessV0KeyHash(*kid);
++        }
++    }
++
+     bool fUpdated = false;
+     {
+         LOCK(cs_wallet); // mapAddressBook
+-        std::map<CTxDestination, std::string>::iterator mi = mapAddressBook.find(address);
++        std::map<CTxDestination, std::string>::iterator mi = mapAddressBook.find(dest);
+         fUpdated = mi != mapAddressBook.end();
+-        mapAddressBook[address] = strName;
++        mapAddressBook[dest] = strName;
+     }
+     NotifyAddressBookChanged(this, address, strName, ::IsMine(*this, address) != ISMINE_NO,
+                              (fUpdated ? CT_UPDATED : CT_NEW) );
+     if (!fFileBacked)
+         return false;
+-    return CWalletDB(strWalletFile).WriteName(CHexlanAddress(address).ToString(), strName);
++    return CWalletDB(strWalletFile).WriteName(EncodeDestination(dest), strName);
+ }
+ 
+ bool CWallet::DelAddressBookName(const CTxDestination& address)
+ {
++    CTxDestination dest = address;
++    if (!strMnemonic.empty()) {
++        if (const CKeyID* kid = boost::get<CKeyID>(&dest)) {
++            dest = WitnessV0KeyHash(*kid);
++        }
++    }
++
+     {
+         LOCK(cs_wallet); // mapAddressBook
+ 
+-        mapAddressBook.erase(address);
++        mapAddressBook.erase(dest);
+     }
+ 
+     NotifyAddressBookChanged(this, address, "", ::IsMine(*this, address) != ISMINE_NO, CT_DELETED);
+ 
+     if (!fFileBacked)
+         return false;
+-    CWalletDB(strWalletFile).EraseName(CHexlanAddress(address).ToString());
+-    return CWalletDB(strWalletFile).EraseName(CHexlanAddress(address).ToString());
++    CWalletDB(strWalletFile).EraseName(EncodeDestination(dest));
++    return CWalletDB(strWalletFile).EraseName(EncodeDestination(dest));
+ }
+ 
+ bool CWallet::GetTransaction(const uint256 &hashTx, CWalletTx& wtx)
+diff --git a/src/walletdb.cpp b/src/walletdb.cpp
+index d3f1557..ae33914 100644
+--- a/src/walletdb.cpp
++++ b/src/walletdb.cpp
+@@ -4,6 +4,7 @@
+ // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+ 
+ #include "walletdb.h"
++#include "segwit_addr.h"
+ 
+ #include "base58.h"
+ #include "protocol.h"
+@@ -387,7 +388,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
+         {
+             string strAddress;
+             ssKey >> strAddress;
+-            ssValue >> pwallet->mapAddressBook[CHexlanAddress(strAddress).Get()];
++            ssValue >> pwallet->mapAddressBook[DecodeDestination(strAddress)];
+         }
+         else if (strType == "tx")
+         {
