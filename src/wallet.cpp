@@ -70,33 +70,32 @@ CPubKey CWallet::GenerateNewKey()
 
     CKey secret;
 
-    if (!strMnemonic.empty()) {
-        std::vector<uint8_t> vchSeed;
-        SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
-        SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
-        BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
-        
-        CExtKey masterKey;
-        masterKey.SetMaster(&vchSeed[0], vchSeed.size());
-
-        // Стандарт деривации BIP44: m / 44' / 0' / 0' / 0 / nBip39Counter
-        // 0x80000000 означает hardened (усиленную) деривацию
-        CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
-        masterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
-        purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
-        coinTypeKey.Derive(accountKey, 0 | 0x80000000);
-        accountKey.Derive(changeKey, 0); // Внешние адреса (change = 0)
-        changeKey.Derive(childKey, nBip39Counter);
-
-        secret = childKey.key;
-        
-        // Увеличиваем счетчик выданных адресов и фиксируем его в БД
-        nBip39Counter++;
-        CWalletDB(strWalletFile).WriteBip39Counter(nBip39Counter);
-    } else {
-        // Резервный механизм случайной генерации до ввода сид-фразы
-        secret.MakeNewKey(fCompressed);
+    if (strMnemonic.empty()) {
+        throw std::runtime_error("CWallet::GenerateNewKey() : Wallet is not initialized with BIP39 seed phrase");
     }
+
+    std::vector<uint8_t> vchSeed;
+    SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
+    SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
+    BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
+    
+    CExtKey masterKey;
+    masterKey.SetMaster(&vchSeed[0], vchSeed.size());
+
+    // Стандарт деривации BIP44: m / 44' / 0' / 0' / 0 / nBip39Counter
+    // 0x80000000 означает hardened (усиленную) деривацию
+    CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
+    masterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
+    purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
+    coinTypeKey.Derive(accountKey, 0 | 0x80000000);
+    accountKey.Derive(changeKey, 0); // Внешние адреса (change = 0)
+    changeKey.Derive(childKey, nBip39Counter);
+
+    secret = childKey.key;
+    
+    // Увеличиваем счетчик выданных адресов и фиксируем его в БД
+    nBip39Counter++;
+    CWalletDB(strWalletFile).WriteBip39Counter(nBip39Counter);
 
     // Compressed public keys were introduced in version 0.6.0
     if (fCompressed)
@@ -4085,11 +4084,11 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
         else if (fLiteMode)
             nTargetSize = max(GetArg("-keypool", 10), (int64_t)0);
 
-    // Hexlan: Если кошелек еще не инициализирован HD-фразой, генерируем только 1 резервный ключ
+    // Hexlan: Жесткий превентивный запрет на генерацию пула ключей до ввода сид-фразы
     if (strMnemonic.empty())
-        nTargetSize = 1;
-        else
-            nTargetSize = max(GetArg("-keypool", 100), (int64_t)0);
+        return true;
+
+    nTargetSize = max(GetArg("-keypool", 100), (int64_t)0);
 
         while (setKeyPool.size() < (nTargetSize + 1))
         {
@@ -4178,6 +4177,10 @@ bool CWallet::GetKeyFromPool(CPubKey& result)
     CKeyPool keypool;
     {
         LOCK(cs_wallet);
+
+        if (strMnemonic.empty())
+            return false;
+
         ReserveKeyFromKeyPool(nIndex, keypool);
         if (nIndex == -1)
         {
