@@ -74,18 +74,20 @@ CPubKey CWallet::GenerateNewKey()
         throw std::runtime_error("CWallet::GenerateNewKey() : Wallet is not initialized with BIP39 seed phrase");
     }
 
-    std::vector<uint8_t> vchSeed;
-    SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
-    SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
-    BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
-    
-    CExtKey masterKey;
-    masterKey.SetMaster(&vchSeed[0], vchSeed.size());
+    if (!fMasterKeyCached) {
+        std::vector<uint8_t> vchSeed;
+        SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
+        SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
+        BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
+        
+        cachedMasterKey.SetMaster(&vchSeed[0], vchSeed.size());
+        fMasterKeyCached = true;
+    }
 
     // Стандарт деривации BIP44: m / 44' / 0' / 0' / 0 / nBip39Counter
     // 0x80000000 означает hardened (усиленную) деривацию
     CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
-    masterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
+    cachedMasterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
     purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
     coinTypeKey.Derive(accountKey, 0 | 0x80000000);
     accountKey.Derive(changeKey, 0); // Внешние адреса (change = 0)

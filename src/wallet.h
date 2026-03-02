@@ -135,6 +135,8 @@ public:
     SecureString strMnemonic;
     SecureString strMnemonicPassphrase;
     int nBip39Counter;
+    CExtKey cachedMasterKey;
+    bool fMasterKeyCached;
     std::string strWalletFile;
 
     std::set<int64_t> setKeyPool;
@@ -175,6 +177,7 @@ public:
         nTimeFirstKey = 0;
         nLastFilteredHeight = 0;
         fWalletUnlockAnonymizeOnly = false;
+        fMasterKeyCached = false;
     }
 
     std::map<uint256, CWalletTx> mapWallet;
