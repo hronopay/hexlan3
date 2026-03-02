@@ -75,6 +75,7 @@ CPubKey CWallet::GenerateNewKey()
     }
 
     if (!fMasterKeyCached) {
+        int64_t nStart = GetTimeMillis();
         std::vector<uint8_t> vchSeed;
         SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
         SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
@@ -82,10 +83,12 @@ CPubKey CWallet::GenerateNewKey()
         
         cachedMasterKey.SetMaster(&vchSeed[0], vchSeed.size());
         fMasterKeyCached = true;
+        LogPrintf("BIP39: Master key cached in %d ms\n", GetTimeMillis() - nStart);
     }
 
     // Стандарт деривации BIP44: m / 44' / 0' / 0' / 0 / nBip39Counter
     // 0x80000000 означает hardened (усиленную) деривацию
+    int64_t nStartDerive = GetTimeMillis();
     CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
     cachedMasterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
     purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
@@ -94,6 +97,7 @@ CPubKey CWallet::GenerateNewKey()
     changeKey.Derive(childKey, nBip39Counter);
 
     secret = childKey.key;
+    LogPrint("wallet", "BIP39: Key derivation took %d ms\n", GetTimeMillis() - nStartDerive);
     
     // Увеличиваем счетчик выданных адресов и фиксируем его в БД
     nBip39Counter++;
