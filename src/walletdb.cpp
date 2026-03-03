@@ -168,6 +168,12 @@ bool CWalletDB::WriteBip39Counter(int nCounter)
     return Write(std::string("bip39counter"), nCounter);
 }
 
+bool CWalletDB::WriteBip39ChangeCounter(int nCounter)
+{
+    nWalletDBUpdated++;
+    return Write(std::string("bip39changecounter"), nCounter);
+}
+
 bool CWalletDB::WriteMnemonic(const std::string& mnemonic)
 {
     nWalletDBUpdated++;

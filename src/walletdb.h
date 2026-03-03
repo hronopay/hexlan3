@@ -131,6 +131,7 @@ public:
     bool WriteDefaultKey(const CPubKey& vchPubKey);
     bool WriteMnemonic(const std::string& mnemonic);
     bool WriteBip39Counter(int nCounter);
+    bool WriteBip39ChangeCounter(int nCounter);
     bool WriteMnemonicPassphrase(const std::string& passphrase);
 
     bool ReadPool(int64_t nPool, CKeyPool& keypool);

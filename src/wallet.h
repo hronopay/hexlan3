@@ -135,6 +135,7 @@ public:
     SecureString strMnemonic;
     SecureString strMnemonicPassphrase;
     int nBip39Counter;
+    int nBip39ChangeCounter;
     CExtKey cachedMasterKey;
     bool fMasterKeyCached;
     std::string strWalletFile;
@@ -178,6 +179,7 @@ public:
         nLastFilteredHeight = 0;
         fWalletUnlockAnonymizeOnly = false;
         fMasterKeyCached = false;
+        nBip39ChangeCounter = 0;
     }
 
     std::map<uint256, CWalletTx> mapWallet;
@@ -220,6 +222,7 @@ public:
     // keystore implementation
     // Generate a new key
     CPubKey GenerateNewKey();
+    CPubKey GenerateNewChangeKey();
     CPubKey GenerateNewKeyWithDB(CWalletDB* pwalletdb);
     // Adds a key to the store, and saves it to disk.
     bool AddKeyPubKey(const CKey& key, const CPubKey &pubkey);

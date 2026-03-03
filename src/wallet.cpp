@@ -121,6 +121,61 @@ CPubKey CWallet::GenerateNewKey()
     return pubkey;
 }
 
+
+CPubKey CWallet::GenerateNewChangeKey()
+{
+    LogPrintf("TRACE: [GenerateNewChangeKey] Start\n");
+    AssertLockHeld(cs_wallet); // mapKeyMetadata
+    bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY);
+
+    CKey secret;
+
+    if (strMnemonic.empty()) {
+        throw std::runtime_error("CWallet::GenerateNewChangeKey() : Wallet is not initialized with BIP39 seed phrase");
+    }
+
+    if (!fMasterKeyCached) {
+        int64_t nStart = GetTimeMillis();
+        std::vector<uint8_t> vchSeed;
+        SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
+        SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
+        BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
+        
+        cachedMasterKey.SetMaster(&vchSeed[0], vchSeed.size());
+        fMasterKeyCached = true;
+    }
+
+    int64_t nStartDerive = GetTimeMillis();
+    CExtKey purposeKey, coinTypeKey, accountKey, changeKey, childKey;
+    cachedMasterKey.Derive(purposeKey, 84 | 0x80000000); // BIP84 Native SegWit
+    purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
+    coinTypeKey.Derive(accountKey, 0 | 0x80000000);
+    accountKey.Derive(changeKey, 1); // Внутренние адреса (сдача = 1)
+    changeKey.Derive(childKey, nBip39ChangeCounter);
+
+    secret = childKey.key;
+    LogPrint("wallet", "BIP39: Change key derivation took %d ms\n", GetTimeMillis() - nStartDerive);
+    
+    nBip39ChangeCounter++;
+    CWalletDB(strWalletFile).WriteBip39ChangeCounter(nBip39ChangeCounter);
+
+    if (fCompressed)
+        SetMinVersion(FEATURE_COMPRPUBKEY);
+
+    CPubKey pubkey = secret.GetPubKey();
+    assert(secret.VerifyPubKey(pubkey));
+
+    int64_t nCreationTime = GetTime();
+    mapKeyMetadata[pubkey.GetID()] = CKeyMetadata(nCreationTime);
+    if (!nTimeFirstKey || nCreationTime < nTimeFirstKey)
+        nTimeFirstKey = nCreationTime;
+
+    if (!AddKeyPubKey(secret, pubkey))
+        throw std::runtime_error("CWallet::GenerateNewChangeKey() : AddKey failed");
+    return pubkey;
+}
+
+
 bool CWallet::AddKeyPubKey(const CKey& secret, const CPubKey &pubkey)
 {
     AssertLockHeld(cs_wallet); // mapKeyMetadata
@@ -2515,9 +2570,14 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 
                         // Reserve a new key pair from key pool
                         CPubKey vchPubKey;
-                        bool ret;
-                        ret = reservekey.GetReservedKey(vchPubKey);
-                        assert(ret); // should never fail, as we just unlocked
+                        if (!strMnemonic.empty()) {
+                            // HD-кошелек: генерируем специальный адрес для сдачи на лету (BIP44 Internal 1)
+                            vchPubKey = GenerateNewChangeKey();
+                        } else {
+                            bool ret;
+                            ret = reservekey.GetReservedKey(vchPubKey);
+                            assert(ret); // should never fail, as we just unlocked
+                        }
 
                         scriptChange.SetDestination(vchPubKey.GetID());
                     }
