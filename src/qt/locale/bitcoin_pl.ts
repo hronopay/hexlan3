@@ -154,6 +154,11 @@ Możesz dodać kolejny adres dla każdego wysyłającego aby określić od kogo 
 <context>
     <name>AskPassphraseDialog</name>
     <message>
+        <source><b>For staking only</b><br/><small>(Снимите галочку, если хотите разблокировать кошелек полностью)</small></source>
+        <translation><b>For staking only</b><br/><small>(Uncheck to unlock wallet fully for all operations)</small></translation>
+    </message>
+
+    <message>
         <location filename="../forms/askpassphrasedialog.ui" line="+26"/>
         <source>Passphrase Dialog</source>
         <translation>Okienko Hasła</translation>
@@ -304,6 +309,15 @@ Możesz dodać kolejny adres dla każdego wysyłającego aby określić od kogo 
 </context>
 <context>
     <name>BitcoinGUI</name>
+    <message>
+        <source>&amp;Show Mnemonic...</source>
+        <translation>&Show Mnemonic...</translation>
+    </message>
+    <message>
+        <source>BIP39 Seed Backup</source>
+        <translation>BIP39 Seed Backup</translation>
+    </message>
+
     <message>
         <location filename="../bitcoingui.cpp" line="+297"/>
         <source>Sign &amp;message...</source>

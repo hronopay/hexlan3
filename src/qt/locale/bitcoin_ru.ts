@@ -155,6 +155,15 @@ This product includes software developed by the OpenSSL Project for use in the O
 <context>
     <name>AskPassphraseDialog</name>
     <message>
+        <source><b>For staking only</b><br/><small>(Снимите галочку, если хотите разблокировать кошелек полностью)</small></source>
+        <translation><b>Только для стейкинга</b><br/><small>(Снимите галочку, если хотите разблокировать кошелек полностью)</small></translation>
+    </message>
+
+    <message>
+        <source><b>For staking only</b><br/><small>(Снимите галочку, если хотите разблокировать кошелек полностью)</small></source>
+        <translation><b>Только для стейкинга</b><br/><small>(Снимите галочку, если хотите разблокировать кошелек полностью)</small></translation>
+    </message>
+    <message>
         <location filename="../forms/askpassphrasedialog.ui" line="+26"/>
         <source>Passphrase Dialog</source>
         <translation>Диалог ввода пароля</translation>
@@ -305,6 +314,23 @@ This product includes software developed by the OpenSSL Project for use in the O
 </context>
 <context>
     <name>BitcoinGUI</name>
+    <message>
+        <source>&amp;Show Mnemonic...</source>
+        <translation>&Показать сид-фразу...</translation>
+    </message>
+    <message>
+        <source>BIP39 Seed Backup</source>
+        <translation>Бэкап BIP39 Seed</translation>
+    </message>
+
+    <message>
+        <source>&amp;Show Mnemonic...</source>
+        <translation>&amp;Показать сид-фразу...</translation>
+    </message>
+    <message>
+        <source>BIP39 Seed Backup</source>
+        <translation>Бэкап BIP39 Seed</translation>
+    </message>
     <message>
         <location filename="../bitcoingui.cpp" line="+297"/>
         <source>Sign &amp;message...</source>
