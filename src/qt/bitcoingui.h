@@ -101,6 +101,7 @@ private:
     QAction *aboutAction;
     QAction *receiveCoinsAction;
     QAction *optionsAction;
+    QAction *showMnemonicAction;
     QAction *toggleHideAction;
     QAction *exportAction;
     QAction *encryptWalletAction;
@@ -195,6 +196,8 @@ private slots:
     void gotoMessagePage();
     /** Show configuration dialog */
     void optionsClicked();
+    /** Show seed dialog */
+    void showMnemonicClicked();
     /** Show about dialog */
     void aboutClicked();
 #ifndef Q_OS_MAC

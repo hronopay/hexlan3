@@ -366,6 +366,7 @@ void BitcoinGUI::createActions()
     aboutQtAction->setToolTip(tr("Show information about Qt"));
     aboutQtAction->setMenuRole(QAction::AboutQtRole);
     optionsAction = new QAction(QIcon(":/icons/options"), tr("&Options..."), this);
+    showMnemonicAction = new QAction(QIcon(":/icons/key"), tr("&Show Mnemonic..."), this);
     optionsAction->setToolTip(tr("Modify configuration options for Hexlan"));
     optionsAction->setMenuRole(QAction::PreferencesRole);
     toggleHideAction = new QAction(QIcon(":/icons/bitcoin"), tr("&Show / Hide"), this);
@@ -391,6 +392,7 @@ void BitcoinGUI::createActions()
     connect(aboutAction, SIGNAL(triggered()), this, SLOT(aboutClicked()));
     connect(aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
     connect(optionsAction, SIGNAL(triggered()), this, SLOT(optionsClicked()));
+    connect(showMnemonicAction, SIGNAL(triggered()), this, SLOT(showMnemonicClicked())); 
     connect(toggleHideAction, SIGNAL(triggered()), this, SLOT(toggleHidden()));
     connect(encryptWalletAction, SIGNAL(triggered()), this, SLOT(encryptWallet()));
     connect(backupWalletAction, SIGNAL(triggered()), this, SLOT(backupWallet()));
@@ -424,6 +426,7 @@ void BitcoinGUI::createMenuBar()
     settings->addAction(unlockWalletAction);
     settings->addAction(lockWalletAction);
     settings->addSeparator();
+    settings->addAction(showMnemonicAction);
     settings->addAction(optionsAction);
     settings->addAction(showBackupsAction);
 
@@ -1360,4 +1363,23 @@ void BitcoinGUI::showProgress(const QString &title, int nProgress)
     }
     else if (progressDialog)
         progressDialog->setValue(nProgress);
+}
+
+void BitcoinGUI::showMnemonicClicked()
+{
+    if(!walletModel) return;
+    if(walletModel->getEncryptionStatus() == WalletModel::Locked) {
+        AskPassphraseDialog dlg(AskPassphraseDialog::Unlock, this);
+        dlg.setModel(walletModel);
+        if(dlg.exec() != QDialog::Accepted) return;
+    }
+    QString mnemonic = QString::fromStdString(pwalletMain->strMnemonic.c_str());
+    QString passphrase = QString::fromStdString(pwalletMain->strMnemonicPassphrase.c_str());
+    if(mnemonic.isEmpty()) {
+        QMessageBox::critical(this, tr("Error"), tr("Mnemonic not found."));
+        return;
+    }
+    QString message = tr("<b>Mnemonic Phrase:</b><br/><p>%1</p><br/><b>Passphrase:</b><br/>%2")
+                        .arg(mnemonic).arg(passphrase.isEmpty() ? "<i>none</i>" : passphrase);
+    QMessageBox::information(this, tr("BIP39 Seed Backup"), message);
 }
