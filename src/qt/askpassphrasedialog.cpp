@@ -28,7 +28,10 @@ AskPassphraseDialog::AskPassphraseDialog(Mode mode, QWidget *parent) :
     ui->passEdit3->installEventFilter(this);
 
     ui->stakingCheckBox->setChecked(fWalletUnlockStakingOnly);
-    ui->stakingCheckBox->setText(tr("<b>For staking only</b><br/><small>(Uncheck the box to completely unlock)</small>"));
+    // Устанавливаем чистый текст без тегов, чтобы не путать Qt
+    ui->stakingCheckBox->setText(tr("Unlock for staking only"));
+    // А подробное пояснение прячем в ToolTip (всплывающая подсказка при наведении)
+    ui->stakingCheckBox->setToolTip(tr("Uncheck this box if you want to unlock your wallet fully for sending coins or creating new addresses."));
 
     switch(mode)
     {
