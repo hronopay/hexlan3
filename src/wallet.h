@@ -220,8 +220,10 @@ public:
     // keystore implementation
     // Generate a new key
     CPubKey GenerateNewKey();
+    CPubKey GenerateNewKeyWithDB(CWalletDB* pwalletdb);
     // Adds a key to the store, and saves it to disk.
     bool AddKeyPubKey(const CKey& key, const CPubKey &pubkey);
+    bool AddKeyPubKeyWithDB(const CKey& secret, const CPubKey &pubkey, CWalletDB* pwalletdb);
     // Adds a key to the store, without saving it to disk (used by LoadWallet)
     bool LoadKey(const CKey& key, const CPubKey &pubkey) { return CCryptoKeyStore::AddKeyPubKey(key, pubkey); }
     // Load metadata (used by LoadWallet)

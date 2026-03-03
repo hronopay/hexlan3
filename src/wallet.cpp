@@ -4107,7 +4107,7 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
             LogPrintf("keypool added key %d, size=%u\n", nEnd, setKeyPool.size());
             double dProgress = 100.f * nEnd / (nTargetSize + 1);
             std::string strMsg = strprintf(_("Loading wallet... (%3.2f %%)"), dProgress);
-            uiInterface.InitMessage(strMsg);
+            // uiInterface.InitMessage(strMsg); // Отключено для предотвращения Deadlock
         }
     }
     return true;
