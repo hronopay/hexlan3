@@ -141,6 +141,7 @@ public:
 		strDarksendPoolDummyAddress = "hFoQDUrp63QWqFhjEr3Fmc4ubHRhyzjKUC";
 		nLastPOWBlock = 195000;
 		nPOSStartBlock = 10;
+		bech32_hrp = "hx";
 	}
 
 
@@ -204,6 +205,7 @@ public:
 		convertSeeds(vFixedSeeds, pnTestnetSeed, ARRAYLEN(pnTestnetSeed), nDefaultPort);
 
 		nLastPOWBlock = 0x7fffffff;
+		bech32_hrp = "thx";
 	}
 	virtual Network NetworkID() const { return CChainParams::TESTNET; }
 };

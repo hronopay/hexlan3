@@ -4,11 +4,11 @@
 #include "segwit_addr.h"
 #include "base58.h"
 #include "bech32.h"
+#include "chainparams.h"
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/variant/get.hpp>
 
 // Задаем префикс адресов для SegWit в нашей сети (например, hx)
-const std::string SEGWIT_HRP = "hx";
 
 namespace {
     // Конвертер 8-битных байтов в 5-битные слова для Bech32
@@ -49,7 +49,7 @@ namespace {
             std::vector<uint8_t> conv;
             ConvertBits(prog, conv, 8, 5, true);
             data.insert(data.end(), conv.begin(), conv.end());
-            return bech32::Encode(SEGWIT_HRP, data);
+            return bech32::Encode(Params().Bech32HRP(), data);
         }
         
         std::string operator()(const WitnessV0ScriptHash& id) const {
@@ -59,7 +59,7 @@ namespace {
             std::vector<uint8_t> conv;
             ConvertBits(prog, conv, 8, 5, true);
             data.insert(data.end(), conv.begin(), conv.end());
-            return bech32::Encode(SEGWIT_HRP, data);
+            return bech32::Encode(Params().Bech32HRP(), data);
         }
     };
 }
@@ -75,7 +75,7 @@ CTxDestination DecodeDestination(const std::string& str) {
     }
     
     std::pair<std::string, std::vector<uint8_t> > dec = bech32::Decode(str);
-    if (dec.first == SEGWIT_HRP && dec.second.size() > 0) {
+    if (dec.first == Params().Bech32HRP() && dec.second.size() > 0) {
         int version = dec.second[0];
         if (version == 0) {
             std::vector<uint8_t> prog;

@@ -72,6 +72,7 @@ public:
     int POSStartBlock() const { return nPOSStartBlock; }
     int PoolMaxTransactions() const { return nPoolMaxTransactions; }
     std::string DarksendPoolDummyAddress() const { return strDarksendPoolDummyAddress; }
+    const std::string& Bech32HRP() const { return bech32_hrp; }
     //std::string SporkKey() const { return strSporkKey; }
     //std::string MasternodePaymentPubKey() const { return strMasternodePaymentsPubKey; }
 protected:
@@ -92,6 +93,7 @@ protected:
     int nPOSStartBlock;
     int nPoolMaxTransactions;
     std::string strDarksendPoolDummyAddress;
+    std::string bech32_hrp;
     //std::string strSporkKey;
     //std::string strMasternodePaymentsPubKey;
 };

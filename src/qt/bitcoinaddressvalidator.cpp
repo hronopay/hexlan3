@@ -54,10 +54,12 @@ QValidator::State BitcoinAddressValidator::validate(QString &input, int &pos) co
     {
         int ch = input.at(idx).unicode();
 
-        if(((ch >= '0' && ch<='9') ||
-           (ch >= 'a' && ch<='z') ||
-           (ch >= 'A' && ch<='Z')) &&
-           ch != 'l' && ch != 'I' && ch != '0' && ch != 'O')
+        // Hexlan: разрешаем все алфавитно-цифровые символы, 
+        // так как Bech32 использует '0', а Base58 не использует.
+        // Окончательная проверка валидности адреса произойдет позже.
+        if ((ch >= '0' && ch <= '9') ||
+            (ch >= 'a' && ch <= 'z') ||
+            (ch >= 'A' && ch <= 'Z'))
         {
             // Alphanumeric and not a 'forbidden' character
         }

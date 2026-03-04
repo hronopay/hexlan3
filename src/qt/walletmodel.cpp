@@ -228,16 +228,7 @@ void WalletModel::updateWatchOnlyFlag(bool fHaveWatchonly)
 
 bool WalletModel::validateAddress(const QString &address)
 {
-    std::string sAddr = address.toStdString();
-
-    if (sAddr.length() > 75)
-    {
-        if (IsStealthAddress(sAddr))
-            return true;
-    };
-
-    CHexlanAddress addressParsed(sAddr);
-    return addressParsed.IsValid();
+    return IsValidDestinationString(address.toStdString());
 }
 
 WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransaction &transaction, const CCoinControl *coinControl)

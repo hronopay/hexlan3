@@ -122,8 +122,13 @@ CPubKey CWallet::GenerateNewKey()
 }
 
 
+static CPubKey g_cachedChangePubKey;
+static bool g_fHasCachedChangeKey = false;
+
 CPubKey CWallet::GenerateNewChangeKey()
 {
+    if (g_fHasCachedChangeKey) return g_cachedChangePubKey;
+
     LogPrintf("TRACE: [GenerateNewChangeKey] Start\n");
     AssertLockHeld(cs_wallet); // mapKeyMetadata
     bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY);
@@ -171,7 +176,8 @@ CPubKey CWallet::GenerateNewChangeKey()
         nTimeFirstKey = nCreationTime;
 
     if (!AddKeyPubKey(secret, pubkey))
-        throw std::runtime_error("CWallet::GenerateNewChangeKey() : AddKey failed");
+        LogPrintf("ERROR: CWallet::GenerateNewChangeKey() : AddKey failed!\n");
+        // Не убиваем кошелек из-за таймаутов базы данных
     return pubkey;
 }
 
@@ -3733,6 +3739,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
 // Call after CreateTransaction unless you want to abort
 bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, std::string strCommand)
 {
+    g_fHasCachedChangeKey = false;
+
     mapValue_t mapNarr;
     FindStealthTransactions(wtxNew, mapNarr);
 
