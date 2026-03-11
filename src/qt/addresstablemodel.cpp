@@ -1,3 +1,4 @@
+#include "bech32.h"
 #include "segwit_addr.h"
 #include "addresstablemodel.h"
 
@@ -13,6 +14,40 @@
 
 const QString AddressTableModel::Send = "S";
 const QString AddressTableModel::Receive = "R";
+
+// HEXLAN: Локальная конвертация 8-bit в 5-bit для Bech32
+namespace {
+    bool ConvertBits8to5(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
+        uint32_t val = 0;
+        int bits = 0;
+        for (size_t i = 0; i < in.size(); ++i) {
+            val = (val << 8) | in[i];
+            bits += 8;
+            while (bits >= 5) {
+                out.push_back((uint8_t)((val >> (bits - 5)) & 31));
+                bits -= 5;
+            }
+        }
+        if (bits > 0) {
+            out.push_back((uint8_t)((val << (5 - bits)) & 31));
+        }
+        return true;
+    }
+}
+
+// HEXLAN: Универсальный рендерер адресов для адресной книги
+static std::string DestinationToUIString(const CTxDestination& dest) {
+    if (const CKeyID* keyID = boost::get<CKeyID>(&dest)) {
+        std::vector<uint8_t> program(keyID->begin(), keyID->end());
+        std::vector<uint8_t> data;
+        data.push_back(0); // Witness version 0
+        std::vector<uint8_t> conv;
+        ConvertBits8to5(program, conv);
+        data.insert(data.end(), conv.begin(), conv.end());
+        return bech32::Encode("hx", data);
+    }
+    return EncodeDestination(dest);
+}
 
 struct AddressTableEntry
 {
@@ -65,12 +100,12 @@ public:
             LOCK(wallet->cs_wallet);
             BOOST_FOREACH(const PAIRTYPE(CTxDestination, std::string)& item, wallet->mapAddressBook)
             {
-                const CHexlanAddress& address = item.first;
+                const CTxDestination& dest = item.first;
                 const std::string& strName = item.second;
-                bool fMine = IsMine(*wallet, address.Get());
+                bool fMine = IsMine(*wallet, dest);
                 cachedAddressTable.append(AddressTableEntry(fMine ? AddressTableEntry::Receiving : AddressTableEntry::Sending,
                                   QString::fromStdString(strName),
-                                  QString::fromStdString(address.ToString())));
+                                  QString::fromStdString(DestinationToUIString(dest))));
             }
 
             std::set<CStealthAddress>::iterator it;
@@ -276,7 +311,7 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
             }
             // Check for duplicate addresses to prevent accidental deletion of addresses, if you try
             // to paste an existing address over another address (with a different label)
-            else if(wallet->mapAddressBook.count(CHexlanAddress(value.toString().toStdString()).Get()))
+            else if(wallet->mapAddressBook.count(DecodeDestination(value.toString().toStdString())))
             {
                 editStatus = DUPLICATE_ADDRESS;
                 return false;
@@ -287,9 +322,9 @@ bool AddressTableModel::setData(const QModelIndex &index, const QVariant &value,
                 {
                     LOCK(wallet->cs_wallet);
                     // Remove old entry
-                    wallet->DelAddressBookName(CHexlanAddress(rec->address.toStdString()).Get());
+                    wallet->DelAddressBookName(DecodeDestination(rec->address.toStdString()));
                     // Add new entry with new address
-                    wallet->SetAddressBookName(CHexlanAddress(value.toString().toStdString()).Get(), rec->label.toStdString());
+                    wallet->SetAddressBookName(DecodeDestination(value.toString().toStdString()), rec->label.toStdString());
                 }
             }
             break;
@@ -431,7 +466,7 @@ QString AddressTableModel::addRow(const QString &type, const QString &label, con
                 editStatus = KEY_GENERATION_FAILURE;
                 return QString();
             }
-            strAddress = (!wallet->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(newKey.GetID())) : CHexlanAddress(newKey.GetID()).ToString());
+            strAddress = (!wallet->strMnemonic.empty() ? EncodeDestination(WitnessV0KeyHash(newKey.GetID())) : DestinationToUIString(newKey.GetID()));
             
             {
                 LOCK(wallet->cs_wallet);
@@ -460,7 +495,7 @@ bool AddressTableModel::removeRows(int row, int count, const QModelIndex &parent
     }
     {
         LOCK(wallet->cs_wallet);
-        wallet->DelAddressBookName(CHexlanAddress(rec->address.toStdString()).Get());
+        wallet->DelAddressBookName(DecodeDestination(rec->address.toStdString()));
     }
     return true;
 }
@@ -487,8 +522,8 @@ QString AddressTableModel::labelForAddress(const QString &address) const
             return QString::fromStdString(it->label);
         } else
         {
-            CHexlanAddress address_parsed(sAddr);
-            std::map<CTxDestination, std::string>::iterator mi = wallet->mapAddressBook.find(address_parsed.Get());
+            CTxDestination dest = DecodeDestination(sAddr);
+            std::map<CTxDestination, std::string>::iterator mi = wallet->mapAddressBook.find(dest);
             if (mi != wallet->mapAddressBook.end())
             {
                 return QString::fromStdString(mi->second);
