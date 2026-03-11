@@ -1,4 +1,4 @@
-#include "segwit_addr.h"
+#include "bech32.h"
 #include "transactionrecord.h"
 
 #include "base58.h"
@@ -9,12 +9,37 @@
 
 #include <stdint.h>
 
+// HEXLAN: Локальная конвертация 8-bit в 5-bit для Bech32
+namespace {
+    bool ConvertBits8to5(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
+        uint32_t val = 0;
+        int bits = 0;
+        for (size_t i = 0; i < in.size(); ++i) {
+            val = (val << 8) | in[i];
+            bits += 8;
+            while (bits >= 5) {
+                out.push_back((uint8_t)((val >> (bits - 5)) & 31));
+                bits -= 5;
+            }
+        }
+        if (bits > 0) {
+            out.push_back((uint8_t)((val << (5 - bits)) & 31));
+        }
+        return true;
+    }
+}
+
 // HEXLAN: Универсальный экстрактор адресов для UI (Native SegWit + Legacy)
 static std::string ExtractUIAddress(const CScript& scriptPubKey, const std::string& fallback) {
     // 1. Прямой парсинг Native SegWit v0 (P2WPKH)
     if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00 && scriptPubKey[1] == 0x14) {
         std::vector<uint8_t> program(scriptPubKey.begin() + 2, scriptPubKey.end());
-        return segwit_addr::encode("hx", 0, program);
+        std::vector<uint8_t> data;
+        data.push_back(0); // Witness version 0
+        std::vector<uint8_t> conv;
+        ConvertBits8to5(program, conv);
+        data.insert(data.end(), conv.begin(), conv.end());
+        return bech32::Encode("hx", data);
     }
     
     // 2. Стандартное извлечение с принудительным апгрейдом старых CKeyID для визуала
@@ -22,7 +47,12 @@ static std::string ExtractUIAddress(const CScript& scriptPubKey, const std::stri
     if (ExtractDestination(scriptPubKey, address)) {
         if (const CKeyID* keyID = boost::get<CKeyID>(&address)) {
             std::vector<uint8_t> program(keyID->begin(), keyID->end());
-            return segwit_addr::encode("hx", 0, program);
+            std::vector<uint8_t> data;
+            data.push_back(0); // Witness version 0
+            std::vector<uint8_t> conv;
+            ConvertBits8to5(program, conv);
+            data.insert(data.end(), conv.begin(), conv.end());
+            return bech32::Encode("hx", data);
         }
         return EncodeDestination(address);
     }
