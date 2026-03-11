@@ -1,4 +1,5 @@
 #include "bech32.h"
+#include "segwit_addr.h"
 #include "transactionrecord.h"
 
 #include "base58.h"
