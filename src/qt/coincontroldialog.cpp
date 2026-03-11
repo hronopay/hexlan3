@@ -1,3 +1,4 @@
+#include "bech32.h"
 #include "segwit_addr.h"
 #include "coincontroldialog.h"
 #include "ui_coincontroldialog.h"
@@ -31,6 +32,57 @@
 using namespace std;
 QList<qint64> CoinControlDialog::payAmounts;
 CCoinControl* CoinControlDialog::coinControl = new CCoinControl();
+
+// HEXLAN: Локальная конвертация 8-bit в 5-bit для Bech32
+namespace {
+    bool ConvertBits8to5(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
+        uint32_t val = 0;
+        int bits = 0;
+        for (size_t i = 0; i < in.size(); ++i) {
+            val = (val << 8) | in[i];
+            bits += 8;
+            while (bits >= 5) {
+                out.push_back((uint8_t)((val >> (bits - 5)) & 31));
+                bits -= 5;
+            }
+        }
+        if (bits > 0) {
+            out.push_back((uint8_t)((val << (5 - bits)) & 31));
+        }
+        return true;
+    }
+}
+
+// HEXLAN: Универсальный экстрактор адресов для UI (Native SegWit + Legacy)
+static std::string ExtractUIAddress(const CScript& scriptPubKey, const std::string& fallback) {
+    // 1. Прямой парсинг Native SegWit v0 (P2WPKH)
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00 && scriptPubKey[1] == 0x14) {
+        std::vector<uint8_t> program(scriptPubKey.begin() + 2, scriptPubKey.end());
+        std::vector<uint8_t> data;
+        data.push_back(0); // Witness version 0
+        std::vector<uint8_t> conv;
+        ConvertBits8to5(program, conv);
+        data.insert(data.end(), conv.begin(), conv.end());
+        return bech32::Encode("hx", data);
+    }
+    
+    // 2. Стандартное извлечение с принудительным апгрейдом старых CKeyID для визуала
+    CTxDestination address;
+    if (ExtractDestination(scriptPubKey, address)) {
+        if (const CKeyID* keyID = boost::get<CKeyID>(&address)) {
+            std::vector<uint8_t> program(keyID->begin(), keyID->end());
+            std::vector<uint8_t> data;
+            data.push_back(0); // Witness version 0
+            std::vector<uint8_t> conv;
+            ConvertBits8to5(program, conv);
+            data.insert(data.end(), conv.begin(), conv.end());
+            return bech32::Encode("hx", data);
+        }
+        return EncodeDestination(address);
+    }
+    
+    return fallback;
+}
 
 CoinControlDialog::CoinControlDialog(QWidget *parent) :
     QDialog(parent),
@@ -710,7 +762,19 @@ void CoinControlDialog::updateView()
         QTreeWidgetItem *itemWalletAddress = new QTreeWidgetItem();
         itemWalletAddress->setCheckState(COLUMN_CHECKBOX, Qt::Unchecked);
         QString sWalletAddress = coins.first;
+        
+        // HEXLAN: Convert map grouping address to SegWit UI format if possible
+        if (!coins.second.empty()) {
+            const COutput& firstOut = coins.second.front();
+            std::string realAddr = ExtractUIAddress(firstOut.tx->vout[firstOut.i].scriptPubKey, sWalletAddress.toStdString());
+            sWalletAddress = QString::fromStdString(realAddr);
+        }
+
         QString sWalletLabel = model->getAddressTableModel()->labelForAddress(sWalletAddress);
+        // Fallback: If addressbook was saved with old format, try to fetch label using old address string
+        if (sWalletLabel.isEmpty() && sWalletAddress != coins.first) {
+             sWalletLabel = model->getAddressTableModel()->labelForAddress(coins.first);
+        }
         if (sWalletLabel.isEmpty())
             sWalletLabel = tr("(no label)");
 
@@ -747,11 +811,15 @@ void CoinControlDialog::updateView()
 
             // address
             CTxDestination outputAddress;
-            QString sAddress = "";
-            if(ExtractDestination(out.tx->vout[out.i].scriptPubKey, outputAddress))
-            {
+            QString sAddress = QString::fromStdString(ExtractUIAddress(out.tx->vout[out.i].scriptPubKey, ""));
+            bool fExtracted = ExtractDestination(out.tx->vout[out.i].scriptPubKey, outputAddress);
+            
+            if (sAddress.isEmpty() && fExtracted) {
                 sAddress = QString::fromStdString(EncodeDestination(outputAddress));
+            }
 
+            if(fExtracted)
+            {
                 // if listMode or change => show bitcoin address. In tree mode, address is not shown again for direct wallet address outputs
                 if (!treeMode || (!(sAddress == sWalletAddress)))
                     itemOutput->setText(COLUMN_ADDRESS, sAddress);
@@ -760,6 +828,11 @@ void CoinControlDialog::updateView()
                 CKeyID *keyid = boost::get< CKeyID >(&outputAddress);
                 if (keyid && model->getPubKey(*keyid, pubkey) && !pubkey.IsCompressed())
                     nInputSize = 180;
+            }
+            else if (!sAddress.isEmpty())
+            {
+                if (!treeMode || (!(sAddress == sWalletAddress)))
+                    itemOutput->setText(COLUMN_ADDRESS, sAddress);
             }
 
             // label
