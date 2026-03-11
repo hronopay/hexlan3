@@ -7,9 +7,62 @@
 #include "walletmodel.h"
 #include "rpcconsole.h"
 #include "transactionrecord.h"
+#include "bech32.h"
+#include "segwit_addr.h"
 
 #include <sstream>
 #include <string>
+#include <iomanip>
+
+// HEXLAN: Локальная конвертация 8-bit в 5-bit для Bech32
+namespace {
+    bool ConvertBits8to5(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
+        uint32_t val = 0;
+        int bits = 0;
+        for (size_t i = 0; i < in.size(); ++i) {
+            val = (val << 8) | in[i];
+            bits += 8;
+            while (bits >= 5) {
+                out.push_back((uint8_t)((val >> (bits - 5)) & 31));
+                bits -= 5;
+            }
+        }
+        if (bits > 0) {
+            out.push_back((uint8_t)((val << (5 - bits)) & 31));
+        }
+        return true;
+    }
+}
+
+// HEXLAN: Универсальный экстрактор адресов для UI
+static std::string ExtractUIAddress(const CScript& scriptPubKey, const std::string& fallback) {
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00 && scriptPubKey[1] == 0x14) {
+        std::vector<uint8_t> program(scriptPubKey.begin() + 2, scriptPubKey.end());
+        std::vector<uint8_t> data;
+        data.push_back(0); // Witness version 0
+        std::vector<uint8_t> conv;
+        ConvertBits8to5(program, conv);
+        data.insert(data.end(), conv.begin(), conv.end());
+        return bech32::Encode("hx", data);
+    }
+    
+    CTxDestination address;
+    if (ExtractDestination(scriptPubKey, address)) {
+        if (const CKeyID* keyID = boost::get<CKeyID>(&address)) {
+            std::vector<uint8_t> program(keyID->begin(), keyID->end());
+            std::vector<uint8_t> data;
+            data.push_back(0); // Witness version 0
+            std::vector<uint8_t> conv;
+            ConvertBits8to5(program, conv);
+            data.insert(data.end(), conv.begin(), conv.end());
+            return bech32::Encode("hx", data);
+        }
+        return EncodeDestination(address);
+    }
+    
+    return fallback;
+}
+
 double getBlockHardness(int height)
 {
     const CBlockIndex* blockindex = getBlockIndex(height);
@@ -154,6 +207,11 @@ int blocksInPastHours(int hours)
     return 0;
 }
 
+double convertCoins(int64_t amount)
+{
+    return (double)amount / (double)COIN;
+}
+
 double getTxTotalValue(std::string txid)
 {
     uint256 hash;
@@ -162,27 +220,14 @@ double getTxTotalValue(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return 1000;
-
-    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-    ssTx << tx;
+        return 0.0; // HEXLAN Fix: Not 1000
 
     double value = 0;
-    double buffer = 0;
     for (unsigned int i = 0; i < tx.vout.size(); i++)
     {
-        const CTxOut& txout = tx.vout[i];
-
-        buffer = value + convertCoins(txout.nValue);
-        value = buffer;
+        value += convertCoins(tx.vout[i].nValue);
     }
-
     return value;
-}
-
-double convertCoins(int64_t amount)
-{
-    return (double)amount / (double)COIN;
 }
 
 std::string getOutputs(std::string txid)
@@ -193,28 +238,18 @@ std::string getOutputs(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return "fail";
-
-    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-    ssTx << tx;
+        return "Transaction not found (requires -txindex=1)\n";
 
     std::string str = "";
     for (unsigned int i = 0; i < tx.vout.size(); i++)
     {
         const CTxOut& txout = tx.vout[i];
-        CTxDestination source;
-        ExtractDestination(txout.scriptPubKey, source);
-        CHexlanAddress addressSource(source);
-        std::string lol7 = addressSource.ToString();
+        std::string addrStr = ExtractUIAddress(txout.scriptPubKey, "Unknown/Non-Standard");
+        
         double buffer = convertCoins(txout.nValue);
-		std::ostringstream ss;
-		ss << std::fixed << std::setprecision(4) << buffer;
-        std::string amount = ss.str();
-        str.append(lol7);
-        str.append(": ");
-        str.append(amount);
-        str.append(" HEXLAN");
-        str.append("\n");
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(4) << buffer;
+        str += addrStr + ": " + ss.str() + " HEXLAN\n";
     }
 
     return str;
@@ -228,39 +263,33 @@ std::string getInputs(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return "fail";
+        return "Transaction not found (requires -txindex=1)\n";
 
-    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-    ssTx << tx;
+    if (tx.IsCoinBase())
+        return "Coinbase (Mined)\n";
 
     std::string str = "";
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        uint256 hash;
         const CTxIn& vin = tx.vin[i];
-        hash.SetHex(vin.prevout.hash.ToString());
+        uint256 prevHash = vin.prevout.hash;
+        
         CTransaction wtxPrev;
-        uint256 hashBlock = 0;
-        if (!GetTransaction(hash, wtxPrev, hashBlock))
-             return "fail";
+        uint256 hashBlockPrev = 0;
+        if (!GetTransaction(prevHash, wtxPrev, hashBlockPrev)) {
+            str += "Unknown Input: ? HEXLAN\n";
+            continue;
+        }
 
-        CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-        ssTx << wtxPrev;
-
-        CTxDestination source;
-        ExtractDestination(wtxPrev.vout[vin.prevout.n].scriptPubKey, source);
-        CHexlanAddress addressSource(source);
-        std::string lol6 = addressSource.ToString();
-        const CScript target = wtxPrev.vout[vin.prevout.n].scriptPubKey;
-        double buffer = convertCoins(getInputValue(wtxPrev, target));
-		std::ostringstream ss;
-		ss << std::fixed << std::setprecision(4) << buffer;
-        std::string amount = ss.str();
-        str.append(lol6);
-        str.append(": ");
-        str.append(amount);
-        str.append(" HEXLAN");
-        str.append("\n");
+        if (vin.prevout.n < wtxPrev.vout.size()) {
+            const CTxOut& prevOut = wtxPrev.vout[vin.prevout.n];
+            std::string addrStr = ExtractUIAddress(prevOut.scriptPubKey, "Unknown");
+            
+            double buffer = convertCoins(prevOut.nValue);
+            std::ostringstream ss;
+            ss << std::fixed << std::setprecision(4) << buffer;
+            str += addrStr + ": " + ss.str() + " HEXLAN\n";
+        }
     }
 
     return str;
@@ -268,7 +297,8 @@ std::string getInputs(std::string txid)
 
 int64_t getInputValue(CTransaction tx, CScript target)
 {
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
+    // HEXLAN Fix: iterate over vout, not vin!
+    for (unsigned int i = 0; i < tx.vout.size(); i++)
     {
         const CTxOut& txout = tx.vout[i];
         if(txout.scriptPubKey == target)
@@ -284,44 +314,36 @@ double getTxFees(std::string txid)
     uint256 hash;
     hash.SetHex(txid);
 
-
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return 51;
+        return 0.0; // HEXLAN Fix: Not 51
 
-    CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-    ssTx << tx;
+    if (tx.IsCoinBase()) return 0.0; // No fee for mining
 
-    double value = 0;
-    double buffer = 0;
-    for (unsigned int i = 0; i < tx.vout.size(); i++)
-    {
-        const CTxOut& txout = tx.vout[i];
-
-        buffer = value + convertCoins(txout.nValue);
-        value = buffer;
+    double valueOut = 0;
+    for (unsigned int i = 0; i < tx.vout.size(); i++) {
+        valueOut += convertCoins(tx.vout[i].nValue);
     }
 
-    double value0 = 0;
-    double buffer0 = 0;
+    double valueIn = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        uint256 hash0;
-        const CTxIn& vin = tx.vin[i];
-        hash0.SetHex(vin.prevout.hash.ToString());
+        uint256 prevHash = tx.vin[i].prevout.hash;
         CTransaction wtxPrev;
-        uint256 hashBlock0 = 0;
-        if (!GetTransaction(hash0, wtxPrev, hashBlock0))
-             return 0;
-        CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
-        ssTx << wtxPrev;
-        const CScript target = wtxPrev.vout[vin.prevout.n].scriptPubKey;
-        buffer0 = value0 + convertCoins(getInputValue(wtxPrev, target));
-        value0 = buffer0;
+        uint256 hashBlockPrev = 0;
+        if (GetTransaction(prevHash, wtxPrev, hashBlockPrev)) {
+             if (tx.vin[i].prevout.n < wtxPrev.vout.size()) {
+                 valueIn += convertCoins(wtxPrev.vout[tx.vin[i].prevout.n].nValue);
+             }
+        }
     }
 
-    return value0 - value;
+    double fee = valueIn - valueOut;
+    // Coinstake transactions have negative fee (Output > Input), so return 0
+    if (fee < 0) return 0.0; 
+    
+    return fee;
 }
 
 
