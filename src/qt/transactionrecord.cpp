@@ -9,6 +9,27 @@
 
 #include <stdint.h>
 
+// HEXLAN: Универсальный экстрактор адресов для UI (Native SegWit + Legacy)
+static std::string ExtractUIAddress(const CScript& scriptPubKey, const std::string& fallback) {
+    // 1. Прямой парсинг Native SegWit v0 (P2WPKH)
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00 && scriptPubKey[1] == 0x14) {
+        std::vector<uint8_t> program(scriptPubKey.begin() + 2, scriptPubKey.end());
+        return segwit_addr::encode("hx", 0, program);
+    }
+    
+    // 2. Стандартное извлечение с принудительным апгрейдом старых CKeyID для визуала
+    CTxDestination address;
+    if (ExtractDestination(scriptPubKey, address)) {
+        if (const CKeyID* keyID = boost::get<CKeyID>(&address)) {
+            std::vector<uint8_t> program(keyID->begin(), keyID->end());
+            return segwit_addr::encode("hx", 0, program);
+        }
+        return EncodeDestination(address);
+    }
+    
+    return fallback;
+}
+
 /* Return positive answer if transaction should be shown in list.
  */
 bool TransactionRecord::showTransaction(const CWalletTx &wtx)
@@ -48,21 +69,20 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if(mine)
             {
                 TransactionRecord sub(hash, nTime);
-                CTxDestination address;
                 sub.idx = parts.size(); // sequence number
                 sub.credit = txout.nValue;
                 sub.involvesWatchAddress = mine == ISMINE_WATCH_ONLY;
-                if (ExtractDestination(txout.scriptPubKey, address) && IsMine(*wallet, address))
+                
+                std::string addrStr = ExtractUIAddress(txout.scriptPubKey, mapValue["from"]);
+                if (!addrStr.empty() && addrStr != mapValue["from"])
                 {
-                    // Received by Bitcoin Address
                     sub.type = TransactionRecord::RecvWithAddress;
-                    sub.address = EncodeDestination(address);
+                    sub.address = addrStr;
                 }
                 else
                 {
-                    // Received by IP connection (deprecated features), or a multisignature or other non-simple transaction
                     sub.type = TransactionRecord::RecvFromOther;
-                    sub.address = mapValue["from"];
+                    sub.address = addrStr;
                 }
 
                 if (wtx.IsCoinBase())
@@ -141,17 +161,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             if(mapValue["DS"] == "1")
             {
                 sub.type = TransactionRecord::Darksent;
-                CTxDestination address;
-                if (ExtractDestination(wtx.vout[0].scriptPubKey, address))
-                {
-                    // Sent to Dash Address
-                    sub.address = EncodeDestination(address);
-                }
-                else
-                {
-                    // Sent to IP, or other non-address transaction like OP_EVAL
-                    sub.address = mapValue["to"];
-                }
+                sub.address = ExtractUIAddress(wtx.vout[0].scriptPubKey, mapValue["to"]);
             }
             else
             {
@@ -195,19 +205,18 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     continue;
                 }
 
-                CTxDestination address;
-                if (ExtractDestination(txout.scriptPubKey, address))
+                std::string addrStr = ExtractUIAddress(txout.scriptPubKey, mapValue["to"]);
+                if (!addrStr.empty() && addrStr != mapValue["to"])
                 {
-                    // Sent to Bitcoin Address
                     sub.type = TransactionRecord::SendToAddress;
-                    sub.address = EncodeDestination(address);
+                    sub.address = addrStr;
                 }
                 else
                 {
-                    // Sent to IP, or other non-address transaction like OP_EVAL
                     sub.type = TransactionRecord::SendToOther;
-                    sub.address = mapValue["to"];
+                    sub.address = addrStr;
                 }
+                
                 if(mapValue["DS"] == "1")
                 {
                     sub.type = TransactionRecord::Darksent;
