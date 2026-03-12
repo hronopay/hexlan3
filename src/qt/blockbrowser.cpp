@@ -365,6 +365,9 @@ BlockBrowser::BlockBrowser(QWidget *parent) :
     connect(ui->txID, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
     connect(ui->outputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
     connect(ui->inputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
+
+    ui->heightBox->setKeyboardTracking(false);
+    connect(ui->heightBox, SIGNAL(valueChanged(int)), this, SLOT(blockClicked()));
 }
 
 // HEXLAN: Единый мозг Эксплорера (Синхронизация верхнего и нижнего окон)
