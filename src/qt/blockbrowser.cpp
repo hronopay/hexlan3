@@ -432,7 +432,7 @@ void BlockBrowser::updateExplorer(bool block)
             // Это Хэш Блока!
             CBlockIndex* pblockindex = mapBlockIndex[hash];
             CBlock blockData;
-            ReadBlockFromDisk(blockData, pblockindex); // Читаем сам блок с диска, чтобы достать транзакции
+            blockData.ReadFromDisk(pblockindex); // Читаем сам блок с диска, чтобы достать транзакции
 
             ui->txLabel->setText("Block Hash:");
             ui->txID->setText(QString::fromStdString(query));

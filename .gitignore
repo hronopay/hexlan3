@@ -9,6 +9,7 @@ dist/
 release/
 debug/
 bin.v2/
+Hexlan_Reference/
 
 # ===========================
 # ВРЕМЕННЫЕ ФАЙЛЫ QT & IDE
@@ -74,3 +75,5 @@ Thumbs.db
 # ===========================
 !src/makefile.hexlan_static
 auto_push\.sh
+Doxyfile
+setup_docs.py
