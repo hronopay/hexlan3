@@ -238,7 +238,7 @@ std::string getOutputs(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return "Transaction not found (requires -txindex=1)\n";
+        return "Transaction not found (requires -txindex=1)<br>";
 
     std::string str = "";
     for (unsigned int i = 0; i < tx.vout.size(); i++)
@@ -249,7 +249,7 @@ std::string getOutputs(std::string txid)
         double buffer = convertCoins(txout.nValue);
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(4) << buffer;
-        str += addrStr + ": " + ss.str() + " HEXLAN\n";
+        str += addrStr + ": " + ss.str() + " HEXLAN<br>";
     }
 
     return str;
@@ -263,10 +263,10 @@ std::string getInputs(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return "Transaction not found (requires -txindex=1)\n";
+        return "Transaction not found (requires -txindex=1)<br>";
 
     if (tx.IsCoinBase())
-        return "Coinbase (Mined)\n";
+        return "Coinbase (Mined)<br>";
 
     std::string str = "";
     for (unsigned int i = 0; i < tx.vin.size(); i++)
@@ -277,7 +277,7 @@ std::string getInputs(std::string txid)
         CTransaction wtxPrev;
         uint256 hashBlockPrev = 0;
         if (!GetTransaction(prevHash, wtxPrev, hashBlockPrev)) {
-            str += "Unknown Input: ? HEXLAN\n";
+            str += "Unknown Input: ? HEXLAN<br>";
             continue;
         }
 
@@ -288,7 +288,11 @@ std::string getInputs(std::string txid)
             double buffer = convertCoins(prevOut.nValue);
             std::ostringstream ss;
             ss << std::fixed << std::setprecision(4) << buffer;
-            str += addrStr + ": " + ss.str() + " HEXLAN\n";
+            
+            // HEXLAN: Пасхалка — Кликабельный микро-хэш предыдущей транзакции (чтобы шагать назад)
+            std::string prevHashStr = prevHash.GetHex();
+            std::string shortHash = prevHashStr.substr(0, 8) + "...";
+            str += "[<a style=\"text-decoration:none;\" href=\"" + prevHashStr + "\">" + shortHash + "</a>] " + addrStr + ": " + ss.str() + " HEXLAN<br>";
         }
     }
 
@@ -339,7 +343,6 @@ double getTxFees(std::string txid)
     }
 
     double fee = valueIn - valueOut;
-    // Coinstake transactions have negative fee (Output > Input), so return 0
     if (fee < 0) return 0.0; 
     
     return fee;
@@ -356,9 +359,15 @@ BlockBrowser::BlockBrowser(QWidget *parent) :
         
     connect(ui->blockButton, SIGNAL(pressed()), this, SLOT(blockClicked()));
     connect(ui->txButton, SIGNAL(pressed()), this, SLOT(txClicked()));
+
+    // HEXLAN: Ловим клики по всем HTML-ссылкам в интерфейсе
+    connect(ui->hashBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
+    connect(ui->txID, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
+    connect(ui->outputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
+    connect(ui->inputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
 }
 
-// HEXLAN: Функция вызывается снаружи (из BitcoinGUI) для автопоиска
+// HEXLAN: Функция вызывается снаружи (из BitcoinGUI) или при клике на гиперссылку
 void BlockBrowser::setSearchQuery(QString query)
 {
     ui->txBox->setText(query);
@@ -395,15 +404,20 @@ void BlockBrowser::updateExplorer(bool block)
         int nNonce = getBlockNonce(height);
         int atime = getBlockTime(height);
         double hardness = getBlockHardness(height);
+        
         QString QHeight = QString::number(height);
-        QString QHash = QString::fromUtf8(hash.c_str());
+        // HEXLAN: Формируем HTML-ссылку для Хэша Блока
+        QString QHashRaw = QString::fromUtf8(hash.c_str());
+        QString QHashLink = "<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + QHashRaw + "\">" + QHashRaw + "</a>";
+        
         QString QMerkle = QString::fromUtf8(merkle.c_str());
         QString QBits = QString::number(nBits);
         QString QNonce = QString::number(nNonce);
         QString QTime = QString::number(atime);
         QString QHardness = QString::number(hardness, 'f', 6);
+        
         ui->heightLabel->setText(QHeight);
-        ui->hashBox->setText(QHash);
+        ui->hashBox->setText(QHashLink);
         ui->merkleBox->setText(QMerkle);
         ui->bitsBox->setText(QBits);
         ui->nonceBox->setText(QNonce);
@@ -432,10 +446,11 @@ void BlockBrowser::updateExplorer(bool block)
             // Это Хэш Блока!
             CBlockIndex* pblockindex = mapBlockIndex[hash];
             CBlock blockData;
-            blockData.ReadFromDisk(pblockindex); // Читаем сам блок с диска, чтобы достать транзакции
+            blockData.ReadFromDisk(pblockindex);
 
             ui->txLabel->setText("Block Hash:");
-            ui->txID->setText(QString::fromStdString(query));
+            QString queryRaw = QString::fromStdString(query);
+            ui->txID->setText("<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + queryRaw + "\">" + queryRaw + "</a>");
             
             ui->valueLabel->setText("Block Height:");
             ui->valueBox->setText(QString::number(pblockindex->nHeight));
@@ -447,11 +462,12 @@ void BlockBrowser::updateExplorer(bool block)
             ui->inputBox->setText(QString::number(pblockindex->nTime));
 
             ui->outputLabel->setText("Transactions:");
-            std::string txList = "";
+            QString txList = "";
             for (unsigned int i = 0; i < blockData.vtx.size(); i++) {
-                txList += blockData.vtx[i].GetHash().GetHex() + "\n";
+                QString txHash = QString::fromStdString(blockData.vtx[i].GetHash().GetHex());
+                txList += "<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + txHash + "\">" + txHash + "</a><br>";
             }
-            ui->outputBox->setText(QString::fromStdString(txList));
+            ui->outputBox->setText(txList);
         } else {
             // Это обычная Транзакция
             ui->txLabel->setText("Transaction ID:");
@@ -462,17 +478,19 @@ void BlockBrowser::updateExplorer(bool block)
 
             double value = getTxTotalValue(query);
             double fees = getTxFees(query);
+            
+            // outputs и inputs теперь уже содержат готовый HTML с <br> (изменено в функциях выше)
             std::string outputs = getOutputs(query);
             std::string inputs = getInputs(query);
             
+            QString queryRaw = QString::fromUtf8(query.c_str());
             QString QValue = QString::number(value, 'f', 6);
-            QString QID = QString::fromUtf8(query.c_str());
             QString QOutputs = QString::fromUtf8(outputs.c_str());
             QString QInputs = QString::fromUtf8(inputs.c_str());
             QString QFees = QString::number(fees, 'f', 6);
             
+            ui->txID->setText("<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + queryRaw + "\">" + queryRaw + "</a>");
             ui->valueBox->setText(QValue + " HEXLAN");
-            ui->txID->setText(QID);
             ui->outputBox->setText(QOutputs);
             ui->inputBox->setText(QInputs);
             ui->feesBox->setText(QFees + " HEXLAN");
