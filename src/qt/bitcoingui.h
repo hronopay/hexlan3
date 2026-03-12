@@ -184,8 +184,8 @@ private slots:
     void gotoSendCoinsPage();
    /** Switch to trading page */
     void gotoTradingPage();
-    /** Switch to block explorer*/
-    void gotoBlockBrowser();
+    /** Switch to block explorer. HEXLAN: добавлена маршрутизация хэша */
+    void gotoBlockBrowser(QString transactionId = "");
     /** Switch to masternode manager page*/
     void gotoMasternodeManagerPage();
     /** Show Sign/Verify Message dialog and switch to sign message tab */

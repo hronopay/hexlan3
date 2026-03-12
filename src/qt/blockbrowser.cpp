@@ -220,7 +220,7 @@ double getTxTotalValue(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return 0.0; // HEXLAN Fix: Not 1000
+        return 0.0;
 
     double value = 0;
     for (unsigned int i = 0; i < tx.vout.size(); i++)
@@ -297,7 +297,6 @@ std::string getInputs(std::string txid)
 
 int64_t getInputValue(CTransaction tx, CScript target)
 {
-    // HEXLAN Fix: iterate over vout, not vin!
     for (unsigned int i = 0; i < tx.vout.size(); i++)
     {
         const CTxOut& txout = tx.vout[i];
@@ -317,7 +316,7 @@ double getTxFees(std::string txid)
     CTransaction tx;
     uint256 hashBlock = 0;
     if (!GetTransaction(hash, tx, hashBlock))
-        return 0.0; // HEXLAN Fix: Not 51
+        return 0.0;
 
     if (tx.IsCoinBase()) return 0.0; // No fee for mining
 
@@ -357,6 +356,13 @@ BlockBrowser::BlockBrowser(QWidget *parent) :
         
     connect(ui->blockButton, SIGNAL(pressed()), this, SLOT(blockClicked()));
     connect(ui->txButton, SIGNAL(pressed()), this, SLOT(txClicked()));
+}
+
+// HEXLAN: Функция вызывается снаружи (из BitcoinGUI) для автопоиска
+void BlockBrowser::setSearchQuery(QString query)
+{
+    ui->txBox->setText(query);
+    updateExplorer(false);
 }
 
 void BlockBrowser::updateExplorer(bool block)
@@ -404,8 +410,8 @@ void BlockBrowser::updateExplorer(bool block)
         ui->timeBox->setText(QTime);     
         ui->hardBox->setText(QHardness);
     } 
-    
-    if(block == false) {
+    else 
+    {
         ui->txID->show();
         ui->txLabel->show();
         ui->valueLabel->show();
@@ -416,21 +422,61 @@ void BlockBrowser::updateExplorer(bool block)
         ui->outputBox->show();
         ui->feesLabel->show();
         ui->feesBox->show();
-        std::string txid = ui->txBox->text().toUtf8().constData();
-        double value = getTxTotalValue(txid);
-        double fees = getTxFees(txid);
-        std::string outputs = getOutputs(txid);
-        std::string inputs = getInputs(txid);
-        QString QValue = QString::number(value, 'f', 6);
-        QString QID = QString::fromUtf8(txid.c_str());
-        QString QOutputs = QString::fromUtf8(outputs.c_str());
-        QString QInputs = QString::fromUtf8(inputs.c_str());
-        QString QFees = QString::number(fees, 'f', 6);
-        ui->valueBox->setText(QValue + " HEXLAN");
-        ui->txID->setText(QID);
-        ui->outputBox->setText(QOutputs);
-        ui->inputBox->setText(QInputs);
-        ui->feesBox->setText(QFees + " HEXLAN");
+        
+        std::string query = ui->txBox->text().trimmed().toUtf8().constData();
+        uint256 hash;
+        hash.SetHex(query);
+
+        // HEXLAN: Умное распознавание (Хэш Блока или Хэш Транзакции)
+        if (mapBlockIndex.count(hash) > 0) {
+            // Это Хэш Блока!
+            CBlockIndex* pblockindex = mapBlockIndex[hash];
+            CBlock blockData;
+            ReadBlockFromDisk(blockData, pblockindex); // Читаем сам блок с диска, чтобы достать транзакции
+
+            ui->txLabel->setText("Block Hash:");
+            ui->txID->setText(QString::fromStdString(query));
+            
+            ui->valueLabel->setText("Block Height:");
+            ui->valueBox->setText(QString::number(pblockindex->nHeight));
+            
+            ui->feesLabel->setText("Tx Count:");
+            ui->feesBox->setText(QString::number(blockData.vtx.size()));
+            
+            ui->inputLabel->setText("Block Time:");
+            ui->inputBox->setText(QString::number(pblockindex->nTime));
+
+            ui->outputLabel->setText("Transactions:");
+            std::string txList = "";
+            for (unsigned int i = 0; i < blockData.vtx.size(); i++) {
+                txList += blockData.vtx[i].GetHash().GetHex() + "\n";
+            }
+            ui->outputBox->setText(QString::fromStdString(txList));
+        } else {
+            // Это обычная Транзакция
+            ui->txLabel->setText("Transaction ID:");
+            ui->valueLabel->setText("Value out:");
+            ui->feesLabel->setText("Fees:");
+            ui->inputLabel->setText("Inputs:");
+            ui->outputLabel->setText("Outputs:");
+
+            double value = getTxTotalValue(query);
+            double fees = getTxFees(query);
+            std::string outputs = getOutputs(query);
+            std::string inputs = getInputs(query);
+            
+            QString QValue = QString::number(value, 'f', 6);
+            QString QID = QString::fromUtf8(query.c_str());
+            QString QOutputs = QString::fromUtf8(outputs.c_str());
+            QString QInputs = QString::fromUtf8(inputs.c_str());
+            QString QFees = QString::number(fees, 'f', 6);
+            
+            ui->valueBox->setText(QValue + " HEXLAN");
+            ui->txID->setText(QID);
+            ui->outputBox->setText(QOutputs);
+            ui->inputBox->setText(QInputs);
+            ui->feesBox->setText(QFees + " HEXLAN");
+        }
     }
 }
 

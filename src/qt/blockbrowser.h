@@ -52,10 +52,10 @@ public:
     void setModel(WalletModel *model);
     
 public slots:
-    
     void blockClicked();
     void txClicked();
     void updateExplorer(bool);
+    void setSearchQuery(QString query); // HEXLAN: Внешний вызов поиска
 
 private slots:
 

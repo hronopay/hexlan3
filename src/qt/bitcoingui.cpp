@@ -245,6 +245,9 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), this, SLOT(gotoHistoryPage()));
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
 
+    // HEXLAN: Сквозной маршрут из транзакций в эксплорер
+    connect(transactionView, SIGNAL(routeToExplorer(QString)), this, SLOT(gotoBlockBrowser(QString)));
+
     connect(TradingAction, SIGNAL(triggered()), tradingDialogPage, SLOT(InitTrading()));
 
     // Double-clicking on a transaction on the transaction history page shows details
@@ -1004,13 +1007,18 @@ void BitcoinGUI::gotoMasternodeManagerPage()
     disconnect(exportAction, SIGNAL(triggered()), 0, 0);
 }
 
-void BitcoinGUI::gotoBlockBrowser()
+// HEXLAN: Умный вызов эксплорера с передачей хэша
+void BitcoinGUI::gotoBlockBrowser(QString transactionId)
 {
     blockAction->setChecked(true);
     centralStackedWidget->setCurrentWidget(blockBrowser);
 
     exportAction->setEnabled(false);
     disconnect(exportAction, SIGNAL(triggered()), 0, 0);
+
+    if(!transactionId.isEmpty()) {
+        blockBrowser->setSearchQuery(transactionId);
+    }
 }
 
 void BitcoinGUI::gotoOverviewPage()
