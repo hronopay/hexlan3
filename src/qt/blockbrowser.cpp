@@ -289,10 +289,10 @@ std::string getInputs(std::string txid)
             std::ostringstream ss;
             ss << std::fixed << std::setprecision(4) << buffer;
             
-            // HEXLAN: Пасхалка — Кликабельный микро-хэш предыдущей транзакции (чтобы шагать назад)
+            // HEXLAN: Улучшенное отображение хэша — показываем 16 символов в начале и 16 в конце
             std::string prevHashStr = prevHash.GetHex();
-            std::string shortHash = prevHashStr.substr(0, 8) + "...";
-            str += "[<a style=\"text-decoration:none;\" href=\"" + prevHashStr + "\">" + shortHash + "</a>] " + addrStr + ": " + ss.str() + " HEXLAN<br>";
+            std::string displayHash = prevHashStr.substr(0, 16) + "..." + prevHashStr.substr(prevHashStr.length() - 16);
+            str += "[<a style=\"text-decoration:none;\" href=\"" + prevHashStr + "\">" + displayHash + "</a>] " + addrStr + ": " + ss.str() + " HEXLAN<br>";
         }
     }
 
@@ -367,9 +367,45 @@ BlockBrowser::BlockBrowser(QWidget *parent) :
     connect(ui->inputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
 }
 
-// HEXLAN: Функция вызывается снаружи (из BitcoinGUI) или при клике на гиперссылку
+// HEXLAN: Единый мозг Эксплорера (Синхронизация верхнего и нижнего окон)
 void BlockBrowser::setSearchQuery(QString query)
 {
+    std::string q = query.trimmed().toStdString();
+    uint256 hash;
+    hash.SetHex(q);
+
+    // 1. Это Хэш Блока?
+    if (mapBlockIndex.count(hash) > 0) {
+        CBlockIndex* pindex = mapBlockIndex[hash];
+        
+        // Синхронизируем верхнюю панель
+        ui->heightBox->setValue(pindex->nHeight);
+        updateExplorer(true);  
+        
+        // Синхронизируем нижнюю панель
+        ui->txBox->setText(query);
+        updateExplorer(false); 
+        return;
+    }
+
+    // 2. Это Хэш Транзакции?
+    CTransaction tx;
+    uint256 hashBlock = 0;
+    if (GetTransaction(hash, tx, hashBlock)) {
+        // Если транзакция в блоке, подтягиваем верхнюю панель к этому блоку
+        if (hashBlock != 0 && mapBlockIndex.count(hashBlock) > 0) {
+            CBlockIndex* pindex = mapBlockIndex[hashBlock];
+            ui->heightBox->setValue(pindex->nHeight);
+            updateExplorer(true);
+        }
+        
+        // Выводим саму транзакцию снизу
+        ui->txBox->setText(query);
+        updateExplorer(false);
+        return;
+    }
+
+    // 3. Fallback (Ничего не найдено)
     ui->txBox->setText(query);
     updateExplorer(false);
 }
@@ -479,7 +515,7 @@ void BlockBrowser::updateExplorer(bool block)
             double value = getTxTotalValue(query);
             double fees = getTxFees(query);
             
-            // outputs и inputs теперь уже содержат готовый HTML с <br> (изменено в функциях выше)
+            // outputs и inputs теперь уже содержат готовый HTML с <br>
             std::string outputs = getOutputs(query);
             std::string inputs = getInputs(query);
             
@@ -501,12 +537,20 @@ void BlockBrowser::updateExplorer(bool block)
 
 void BlockBrowser::txClicked()
 {
-    updateExplorer(false);
+    // HEXLAN: При клике на Decode пропускаем через умный парсер
+    setSearchQuery(ui->txBox->text());
 }
 
 void BlockBrowser::blockClicked()
 {
-    updateExplorer(true);
+    updateExplorer(true); // Обновляем верхнюю панель
+    
+    // HEXLAN: Автоматически обновляем и нижнюю панель содержимым этого блока
+    int height = ui->heightBox->value();
+    if (height > pindexBest->nHeight) height = pindexBest->nHeight;
+    std::string hash = getBlockHash(height);
+    ui->txBox->setText(QString::fromStdString(hash));
+    updateExplorer(false);
 }
 
 void BlockBrowser::setModel(WalletModel *model)
