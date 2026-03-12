@@ -88,17 +88,21 @@ private slots:
     void copyLabel();
     void copyAmount();
     void copyTxID();
+    void showInExplorer(); // HEXLAN: Новая функция для меню
     //void openThirdPartyTxUrl(QString url);
     void updateWatchOnlyColumn(bool fHaveWatchOnly);
 
 signals:
     void doubleClicked(const QModelIndex&);
 
-    /**  Fired when a message should be reported to the user */
+    /** Fired when a message should be reported to the user */
     void message(const QString &title, const QString &message, unsigned int style);
 
     /** Send computed sum back to wallet-view */
     void trxAmount(QString amount);
+    
+    /** HEXLAN: Сигнал для перехода в Block Explorer */
+    void routeToExplorer(QString txhash);
 
 public slots:
     void chooseDate(int idx);

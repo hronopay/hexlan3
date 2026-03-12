@@ -149,6 +149,7 @@ TransactionView::TransactionView(QWidget *parent) :
     QAction *copyTxIDAction = new QAction(tr("Copy transaction ID"), this);
     QAction *editLabelAction = new QAction(tr("Edit label"), this);
     QAction *showDetailsAction = new QAction(tr("Show transaction details"), this);
+    QAction *showInExplorerAction = new QAction(tr("Show in Explorer"), this); // HEXLAN
 
     contextMenu = new QMenu();
     contextMenu->addAction(copyAddressAction);
@@ -157,6 +158,8 @@ TransactionView::TransactionView(QWidget *parent) :
     contextMenu->addAction(copyTxIDAction);
     contextMenu->addAction(editLabelAction);
     contextMenu->addAction(showDetailsAction);
+    contextMenu->addSeparator(); // HEXLAN
+    contextMenu->addAction(showInExplorerAction); // HEXLAN
 
     // Connect actions
     connect(dateWidget, SIGNAL(activated(int)), this, SLOT(chooseDate(int)));
@@ -175,6 +178,7 @@ TransactionView::TransactionView(QWidget *parent) :
     connect(copyTxIDAction, SIGNAL(triggered()), this, SLOT(copyTxID()));
     connect(editLabelAction, SIGNAL(triggered()), this, SLOT(editLabel()));
     connect(showDetailsAction, SIGNAL(triggered()), this, SLOT(showDetails()));
+    connect(showInExplorerAction, SIGNAL(triggered()), this, SLOT(showInExplorer())); // HEXLAN
 }
 
 void TransactionView::setModel(WalletModel *model)
@@ -443,6 +447,21 @@ void TransactionView::showDetails()
     {
         TransactionDescDialog dlg(selection.at(0));
         dlg.exec();
+    }
+}
+
+// HEXLAN: Ловим клик на новой кнопке контекстного меню
+void TransactionView::showInExplorer()
+{
+    if(!transactionView->selectionModel())
+        return;
+    QModelIndexList selection = transactionView->selectionModel()->selectedRows();
+    if(!selection.isEmpty())
+    {
+        // Берем чистый хэш без -000
+        QString txhash = selection.at(0).data(TransactionTableModel::TxHashRole).toString();
+        // Отправляем сигнал "вверх" до главного окна BitcoinGUI
+        emit routeToExplorer(txhash);
     }
 }
 
