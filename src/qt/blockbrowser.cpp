@@ -13,6 +13,12 @@
 #include <sstream>
 #include <string>
 #include <iomanip>
+#include <QStringList>
+
+// HEXLAN: Глобальные переменные для истории навигации
+static QStringList explorerHistory;
+static int explorerHistoryIndex = -1;
+static bool explorerIsNavigating = false;
 
 // HEXLAN: Локальная конвертация 8-bit в 5-bit для Bech32
 namespace {
@@ -29,6 +35,23 @@ namespace {
         }
         if (bits > 0) {
             out.push_back((uint8_t)((val << (5 - bits)) & 31));
+        }
+        return true;
+    }
+}
+
+// HEXLAN: Локальная конвертация 5-bit в 8-bit для Bech32
+namespace {
+    bool ConvertBits5to8(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
+        uint32_t val = 0;
+        int bits = 0;
+        for (size_t i = 0; i < in.size(); ++i) {
+            val = (val << 5) | in[i];
+            bits += 5;
+            while (bits >= 8) {
+                out.push_back((uint8_t)((val >> (bits - 8)) & 0xff));
+                bits -= 8;
+            }
         }
         return true;
     }
@@ -61,6 +84,29 @@ static std::string ExtractUIAddress(const CScript& scriptPubKey, const std::stri
     }
     
     return fallback;
+}
+
+// HEXLAN: Проверка принадлежности скрипта адресу
+static bool IsAddressInScript(const CScript& script, const std::string& targetAddr) {
+    if (targetAddr.substr(0, 3) == "hx1") {
+        auto decoded = bech32::Decode(targetAddr);
+        if (decoded.first == "hx" && decoded.second.size() > 1) {
+            std::vector<uint8_t> program;
+            std::vector<uint8_t> data(decoded.second.begin() + 1, decoded.second.end());
+            if (ConvertBits5to8(data, program) && program.size() == 20) {
+                if (script.size() == 22 && script[0] == 0x00 && script[1] == 0x14) {
+                    return memcmp(&script[2], &program[0], 20) == 0;
+                }
+                CTxDestination dest;
+                if (ExtractDestination(script, dest)) {
+                    if (const CKeyID* keyID = boost::get<CKeyID>(&dest)) {
+                        return memcmp(keyID->begin(), &program[0], 20) == 0;
+                    }
+                }
+            }
+        }
+    }
+    return ExtractUIAddress(script, "") == targetAddr;
 }
 
 double getBlockHardness(int height)
@@ -245,11 +291,12 @@ std::string getOutputs(std::string txid)
     {
         const CTxOut& txout = tx.vout[i];
         std::string addrStr = ExtractUIAddress(txout.scriptPubKey, "Unknown/Non-Standard");
+        std::string addrLink = "<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + addrStr + "\">" + addrStr + "</a>";
         
         double buffer = convertCoins(txout.nValue);
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(4) << buffer;
-        str += addrStr + ": " + ss.str() + " HEXLAN<br>";
+        str += addrLink + ": " + ss.str() + " HEXLAN<br>";
     }
 
     return str;
@@ -284,6 +331,7 @@ std::string getInputs(std::string txid)
         if (vin.prevout.n < wtxPrev.vout.size()) {
             const CTxOut& prevOut = wtxPrev.vout[vin.prevout.n];
             std::string addrStr = ExtractUIAddress(prevOut.scriptPubKey, "Unknown");
+            std::string addrLink = "<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + addrStr + "\">" + addrStr + "</a>";
             
             double buffer = convertCoins(prevOut.nValue);
             std::ostringstream ss;
@@ -292,7 +340,7 @@ std::string getInputs(std::string txid)
             // HEXLAN: Улучшенное отображение хэша — показываем 16 символов в начале и 16 в конце
             std::string prevHashStr = prevHash.GetHex();
             std::string displayHash = prevHashStr.substr(0, 16) + "..." + prevHashStr.substr(prevHashStr.length() - 16);
-            str += "[<a style=\"text-decoration:none;\" href=\"" + prevHashStr + "\">" + displayHash + "</a>] " + addrStr + ": " + ss.str() + " HEXLAN<br>";
+            str += "[<a style=\"text-decoration:none;\" href=\"" + prevHashStr + "\">" + displayHash + "</a>] " + addrLink + ": " + ss.str() + " HEXLAN<br>";
         }
     }
 
@@ -362,18 +410,60 @@ BlockBrowser::BlockBrowser(QWidget *parent) :
 
     // HEXLAN: Ловим клики по всем HTML-ссылкам в интерфейсе
     connect(ui->hashBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
+    connect(ui->txLabel, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
     connect(ui->txID, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
     connect(ui->outputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
     connect(ui->inputBox, SIGNAL(linkActivated(QString)), this, SLOT(setSearchQuery(QString)));
 
     ui->heightBox->setKeyboardTracking(false);
     connect(ui->heightBox, SIGNAL(valueChanged(int)), this, SLOT(blockClicked()));
+    
+    // HEXLAN: Обновляем текст универсальной кнопки
+    ui->txButton->setText("Decode Tx / Block / Address");
 }
 
 // HEXLAN: Единый мозг Эксплорера (Синхронизация верхнего и нижнего окон)
 void BlockBrowser::setSearchQuery(QString query)
 {
     std::string q = query.trimmed().toStdString();
+    if (q.empty()) return;
+
+    if (q == "nav_back") {
+        if (explorerHistoryIndex > 0) {
+            explorerHistoryIndex--;
+            explorerIsNavigating = true;
+            setSearchQuery(explorerHistory[explorerHistoryIndex]);
+            explorerIsNavigating = false;
+        }
+        return;
+    }
+    if (q == "nav_forward") {
+        if (explorerHistoryIndex < explorerHistory.size() - 1) {
+            explorerHistoryIndex++;
+            explorerIsNavigating = true;
+            setSearchQuery(explorerHistory[explorerHistoryIndex]);
+            explorerIsNavigating = false;
+        }
+        return;
+    }
+
+    if (!explorerIsNavigating) {
+        while (explorerHistory.size() > explorerHistoryIndex + 1) {
+            explorerHistory.removeLast();
+        }
+        if (explorerHistory.isEmpty() || explorerHistory.last() != query) {
+            explorerHistory.append(query);
+            explorerHistoryIndex = explorerHistory.size() - 1;
+        }
+    }
+    
+    // HEXLAN: Анализ Адреса?
+    if (q.substr(0, 3) == "hx1") {
+        ui->txBox->setText(query);
+        updateExplorer(false);
+        return;
+    }
+
     uint256 hash;
     hash.SetHex(q);
 
@@ -477,6 +567,81 @@ void BlockBrowser::updateExplorer(bool block)
         ui->feesBox->show();
         
         std::string query = ui->txBox->text().trimmed().toUtf8().constData();
+
+        QString navHTML = "";
+        if (explorerHistoryIndex > 0) navHTML += "<a style=\"text-decoration:none; font-size:16px; font-weight:bold;\" href=\"nav_back\">&#9664;</a>&nbsp;&nbsp;";
+        else navHTML += "<span style=\"color:#888; font-size:16px; font-weight:bold;\">&#9664;</span>&nbsp;&nbsp;";
+        if (explorerHistoryIndex < explorerHistory.size() - 1) navHTML += "<a style=\"text-decoration:none; font-size:16px; font-weight:bold;\" href=\"nav_forward\">&#9654;</a>&nbsp;&nbsp;";
+        else navHTML += "<span style=\"color:#888; font-size:16px; font-weight:bold;\">&#9654;</span>&nbsp;&nbsp;";
+
+        // --- HEXLAN: Анализ Адреса ---
+        if (query.substr(0, 3) == "hx1") {
+            ui->txLabel->setText(navHTML + "Address Detail:");
+            ui->txID->setText(QString::fromStdString(query));
+            ui->valueLabel->setText("Total Received:");
+            ui->feesLabel->setText("Total Sent:");
+            ui->inputLabel->setText("Balance:");
+            ui->outputLabel->setText("Recent Transactions:");
+
+            int64_t received = 0, sent = 0;
+            std::string history = "";
+            int count = 0;
+
+            CBlockIndex* pindex = pindexBest;
+            int blocksToScan = 1000; 
+            while (pindex && blocksToScan-- > 0) {
+                CBlock blockData;
+                if (blockData.ReadFromDisk(pindex)) {
+                    for (unsigned int i = 0; i < blockData.vtx.size(); i++) {
+                        const CTransaction& tx = blockData.vtx[i];
+                        bool found = false;
+                        int64_t tx_net = 0;
+                        for (unsigned int j = 0; j < tx.vout.size(); j++) {
+                            if (IsAddressInScript(tx.vout[j].scriptPubKey, query)) {
+                                received += tx.vout[j].nValue;
+                                tx_net += tx.vout[j].nValue; // Плюс к балансу в этой транзакции
+                                found = true;
+                            }
+                        }
+                        if (!tx.IsCoinBase()) {
+                            for (unsigned int j = 0; j < tx.vin.size(); j++) {
+                                CTransaction prev; uint256 hb;
+                                if (GetTransaction(tx.vin[j].prevout.hash, prev, hb) && tx.vin[j].prevout.n < prev.vout.size()) {
+                                    if (IsAddressInScript(prev.vout[tx.vin[j].prevout.n].scriptPubKey, query)) {
+                                        sent += prev.vout[tx.vin[j].prevout.n].nValue;
+                                        tx_net -= prev.vout[tx.vin[j].prevout.n].nValue; // Минус от баланса в этой транзакции
+                                        found = true;
+                                    }
+                                }
+                            }
+                        }
+                        if (found && count < 20) {
+                            std::string txh = tx.GetHash().GetHex();
+                            std::string blockHash = pindex->phashBlock->GetHex();
+                            std::string blockHeight = QString::number(pindex->nHeight).toStdString();
+                            
+                            // Форматируем сумму, знак и цвет
+                            int64_t abs_net = (tx_net < 0) ? -tx_net : tx_net;
+                            QString netAmountStr = QString::number(convertCoins(abs_net), 'f', 4);
+                            std::string color = (tx_net >= 0) ? "green" : "red";
+                            std::string sign = (tx_net > 0) ? "+" : ((tx_net < 0) ? "-" : "");
+                            
+                            history += "[<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + blockHash + "\">Block " + blockHeight + "</a>] ";
+                            history += "<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + txh + "\">" + txh.substr(0,16) + "...</a> ";
+                            history += "<span style=\"color:" + color + ";\"><b>" + sign + netAmountStr.toStdString() + " HEXLAN</b></span><br>";
+                            count++;
+                        }
+                    }
+                }
+                pindex = pindex->pprev;
+            }
+            ui->valueBox->setText(QString::number(convertCoins(received), 'f', 4) + " HEXLAN");
+            ui->feesBox->setText(QString::number(convertCoins(sent), 'f', 4) + " HEXLAN");
+            ui->inputBox->setText(QString::number(convertCoins(received - sent), 'f', 4) + " HEXLAN");
+            ui->outputBox->setText(QString::fromStdString(history.empty() ? "No recent activity found" : history));
+            return;
+        }
+
         uint256 hash;
         hash.SetHex(query);
 
@@ -487,7 +652,7 @@ void BlockBrowser::updateExplorer(bool block)
             CBlock blockData;
             blockData.ReadFromDisk(pblockindex);
 
-            ui->txLabel->setText("Block Hash:");
+            ui->txLabel->setText(navHTML + "Block Hash:");
             QString queryRaw = QString::fromStdString(query);
             ui->txID->setText("<a style=\"color:#0000ff; text-decoration:none;\" href=\"" + queryRaw + "\">" + queryRaw + "</a>");
             
@@ -509,7 +674,7 @@ void BlockBrowser::updateExplorer(bool block)
             ui->outputBox->setText(txList);
         } else {
             // Это обычная Транзакция
-            ui->txLabel->setText("Transaction ID:");
+            ui->txLabel->setText(navHTML + "Transaction ID:");
             ui->valueLabel->setText("Value out:");
             ui->feesLabel->setText("Fees:");
             ui->inputLabel->setText("Inputs:");
