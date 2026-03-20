@@ -142,7 +142,7 @@ public:
 
     K GetKey() {
         K ret;
-        ret.Decode(&vchData[0], &vchData[Size]);
+        ret.Decode(&vchData[0]);
         return ret;
     }
 

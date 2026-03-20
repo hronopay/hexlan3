@@ -2620,6 +2620,7 @@ json_spirit::Value bip39generate(const json_spirit::Array& params, bool fHelp)
 
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->nBip39Counter = 0;
+    pwalletMain->nTimeFirstKey = 1; // HEXLAN: Заставляем сканировать всю историю с Genesis
     
     CWalletDB walletdb(pwalletMain->strWalletFile);
     walletdb.WriteBip39Counter(0);
@@ -2651,6 +2652,7 @@ json_spirit::Value bip39recover(const json_spirit::Array& params, bool fHelp)
 
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->nBip39Counter = 0;
+    pwalletMain->nTimeFirstKey = 1; // HEXLAN: Заставляем сканировать всю историю с Genesis
     
     CWalletDB walletdb(pwalletMain->strWalletFile);
     walletdb.WriteBip39Counter(0);
@@ -2686,6 +2688,7 @@ json_spirit::Value bip39init(const json_spirit::Array& params, bool fHelp)
     pwalletMain->strMnemonic = mnemonic.c_str();
     pwalletMain->strMnemonicPassphrase = passphrase.c_str();
     pwalletMain->nBip39Counter = 0;
+    pwalletMain->nTimeFirstKey = 1; // HEXLAN: Заставляем сканировать всю историю с Genesis
 
     CWalletDB walletdb(pwalletMain->strWalletFile);
     if (!walletdb.WriteMnemonic(std::string(pwalletMain->strMnemonic.c_str())))
@@ -2696,7 +2699,16 @@ json_spirit::Value bip39init(const json_spirit::Array& params, bool fHelp)
         throw JSONRPCError(RPC_DATABASE_ERROR, "Failed to write counter");
 
     pwalletMain->setKeyPool.clear(); // Сброс случайных ключей
+    
+    // HEXLAN: Устанавливаем дату рождения кошелька в 1 (Genesis), 
+    // чтобы при рескане кошелек не игнорировал старые блоки.
+    pwalletMain->nTimeFirstKey = 1; 
+
     pwalletMain->TopUpKeyPool();     // Генерация HD-пула
+
+    // HEXLAN: Автоматический запуск сканирования блокчейна
+    pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
+    pwalletMain->ReacceptWalletTransactions();
 
     json_spirit::Object result;
     result.push_back(json_spirit::Pair("result", "success"));
@@ -2734,12 +2746,18 @@ json_spirit::Value getxpub(const json_spirit::Array& params, bool fHelp)
     std::vector<uint8_t> vchSeed;
     BIP39::MnemonicToSeed(pwalletMain->strMnemonic, pwalletMain->strMnemonicPassphrase, vchSeed);
     
-    // Создаем мастер-ключ
+    // Создаем мастер-ключ (Корень 'm')
     CExtKey masterKey;
     masterKey.SetMaster(&vchSeed[0], vchSeed.size());
 
-    // Кастрируем приватный ключ, получая публичный (Neuter)
-    CExtPubKey xpub = masterKey.Neuter();
+    // HEXLAN: BIP84 Derivation Path (Спускаемся на уровень m/84'/0'/0')
+    CExtKey purposeKey, coinTypeKey, accountKey;
+    masterKey.Derive(purposeKey, 84 | 0x80000000);
+    purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
+    coinTypeKey.Derive(accountKey, 0 | 0x80000000);
+
+    // Кастрируем account-ключ, получая публичный (Account xpub)
+    CExtPubKey xpub = accountKey.Neuter();
     
     // Оборачиваем в Base58 формат сети Hexlan
     CHexlanExtPubKey hexlanXpub;
@@ -2747,5 +2765,77 @@ json_spirit::Value getxpub(const json_spirit::Array& params, bool fHelp)
 
     json_spirit::Object result;
     result.push_back(json_spirit::Pair("xpub", hexlanXpub.ToString()));
+    return result;
+}
+
+json_spirit::Value importxpub(const json_spirit::Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 1 || params.size() > 3)
+        throw std::runtime_error("importxpub \"xpub\" ...");
+    
+    EnsureWalletIsUnlocked();
+
+    std::string strXpub = params[0].get_str();
+    int nLookahead = params.size() > 1 ? params[1].get_int() : 100;
+    bool fRescan = params.size() > 2 ? params[2].get_bool() : true;
+
+    // HEXLAN: Пуленепробиваемое ручное декодирование (в обход бага сдвига байтов)
+    std::vector<unsigned char> vchRet;
+    if (!DecodeBase58(strXpub, vchRet))
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid xpub string format (Base58 decode failed)");
+
+    if (vchRet.size() != 82)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Invalid xpub length. Expected 82 bytes, got %d", vchRet.size()));
+
+    // Проверка контрольной суммы (Double SHA256)
+    uint256 hash = Hash(vchRet.begin(), vchRet.end() - 4);
+    if (memcmp(&hash, &vchRet[vchRet.size() - 4], 4) != 0)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid xpub checksum");
+
+    CExtPubKey masterPubKey;
+    masterPubKey.Decode(&vchRet[4]); // Точный сдвиг на 4 байта версии
+
+    if (!masterPubKey.pubkey.IsValid())
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Decoded xpub contains invalid public key. Payload shifted?");
+
+    int nAdded = 0;
+
+    for (int chain = 0; chain <= 1; chain++) {
+        CExtPubKey chainPubKey;
+        if (!masterPubKey.Derive(chainPubKey, chain)) continue;
+
+        for (int i = 0; i < nLookahead; i++) {
+            CExtPubKey childPubKey;
+            if (!chainPubKey.Derive(childPubKey, i)) continue;
+
+            CKeyID keyID = childPubKey.pubkey.GetID();
+            
+            CScript scriptBech32;
+            std::vector<unsigned char> vch(keyID.begin(), keyID.end());
+            scriptBech32 << OP_0 << vch;
+            
+            if (!pwalletMain->HaveWatchOnly(scriptBech32)) {
+                pwalletMain->AddWatchOnly(scriptBech32);
+                nAdded++;
+            }
+            
+            CScript scriptP2PKH;
+            scriptP2PKH.SetDestination(keyID);
+            
+            if (!pwalletMain->HaveWatchOnly(scriptP2PKH)) {
+                pwalletMain->AddWatchOnly(scriptP2PKH);
+                nAdded++;
+            }
+        }
+    }
+
+    if (fRescan && nAdded > 0) {
+        pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
+        pwalletMain->ReacceptWalletTransactions();
+    }
+
+    json_spirit::Object result;
+    result.push_back(json_spirit::Pair("addresses_added", nAdded));
+    result.push_back(json_spirit::Pair("rescanned", fRescan));
     return result;
 }

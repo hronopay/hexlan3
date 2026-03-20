@@ -116,6 +116,7 @@ private:
     QAction *blockAction;
     QAction *TradingAction;
     QAction *showBackupsAction;
+    QAction *importXpubAction;
 
     QSystemTrayIcon *trayIcon;
     Notificator *notificator;
@@ -196,6 +197,7 @@ private slots:
     void gotoMessagePage();
     /** Show configuration dialog */
     void optionsClicked();
+    void importXpubClicked();
     /** Show seed dialog */
     void showMnemonicClicked();
     /** Show about dialog */

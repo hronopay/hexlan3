@@ -22,6 +22,10 @@
 #include "wallet.h"
 #include "walletdb.h"
 #include <QMessageBox>
+#include <QInputDialog>
+#include "rpcserver.h"
+
+extern json_spirit::Value importxpub(const json_spirit::Array& params, bool fHelp);
 
 #include "editaddressdialog.h"
 #include "optionsmodel.h"
@@ -58,6 +62,10 @@
 #include <QStatusBar>
 #include <QLabel>
 #include <QMessageBox>
+#include <QInputDialog>
+#include "rpcserver.h"
+
+extern json_spirit::Value importxpub(const json_spirit::Array& params, bool fHelp);
 #include <QMimeData>
 #include <QProgressBar>
 #include <QProgressDialog>
@@ -385,6 +393,8 @@ void BitcoinGUI::createActions()
     lockWalletAction->setToolTip(tr("Lock wallet"));
     signMessageAction = new QAction(QIcon(":/icons/edit"), tr("Sign &message..."), this);
     verifyMessageAction = new QAction(QIcon(":/icons/transaction_0"), tr("&Verify message..."), this);
+    importXpubAction = new QAction(QIcon(":/icons/add"), tr("Import Watch-Only &xpub..."), this);
+    importXpubAction->setToolTip(tr("Import a BIP32 Extended Public Key for cold storage"));
 
     exportAction = new QAction(QIcon(":/icons/export"), tr("&Export..."), this);
     exportAction->setToolTip(tr("Export the data in the current tab to a file"));
@@ -404,6 +414,7 @@ void BitcoinGUI::createActions()
     connect(lockWalletAction, SIGNAL(triggered()), this, SLOT(lockWallet()));
     connect(signMessageAction, SIGNAL(triggered()), this, SLOT(gotoSignMessageTab()));
     connect(verifyMessageAction, SIGNAL(triggered()), this, SLOT(gotoVerifyMessageTab()));
+    connect(importXpubAction, SIGNAL(triggered()), this, SLOT(importXpubClicked()));
 }
 
 void BitcoinGUI::createMenuBar()
@@ -420,6 +431,8 @@ void BitcoinGUI::createMenuBar()
     file->addAction(exportAction);
     file->addAction(signMessageAction);
     file->addAction(verifyMessageAction);
+    file->addSeparator();
+    file->addAction(importXpubAction);
     file->addSeparator();
     file->addAction(quitAction);
 
@@ -574,41 +587,56 @@ void BitcoinGUI::setWalletModel(WalletModel *walletModel)
         }
         // ---------------------------------------
         // --- HEXLAN BIP39 GUI INTERCEPT ---
-        if (pwalletMain && pwalletMain->strMnemonic.empty()) {
-            QMessageBox::StandardButton reply;
-            reply = QMessageBox::question(this, tr("Wallet Initialization"),
-                tr("No HD seed found.\n\nClick YES to GENERATE a new 12-word phrase.\nClick NO to RECOVER from an existing phrase."),
-                QMessageBox::Yes|QMessageBox::No);
+        if (pwalletMain && pwalletMain->strMnemonic.empty() && !pwalletMain->HaveWatchOnly()) {
+            QMessageBox msgBox(this);
+            msgBox.setWindowTitle(tr("Wallet Initialization"));
+            msgBox.setText(tr("No HD seed found. Please choose how to initialize your wallet:"));
+            
+            QPushButton *genBtn = msgBox.addButton(tr("Generate Seed"), QMessageBox::ActionRole);
+            QPushButton *resBtn = msgBox.addButton(tr("Restore from Seed"), QMessageBox::ActionRole);
+            QPushButton *watchBtn = msgBox.addButton(tr("Watch-Only Wallet (Empty)"), QMessageBox::ActionRole);
+            
+            msgBox.exec();
 
-            Bip39Dialog::Mode mode = (reply == QMessageBox::Yes) ? Bip39Dialog::GENERATE : Bip39Dialog::RECOVER;
-            Bip39Dialog bip39Dlg(mode, this);
+            if (msgBox.clickedButton() == genBtn || msgBox.clickedButton() == resBtn) {
+                Bip39Dialog::Mode mode = (msgBox.clickedButton() == genBtn) ? Bip39Dialog::GENERATE : Bip39Dialog::RECOVER;
+                Bip39Dialog bip39Dlg(mode, this);
 
-            if (bip39Dlg.exec() == QDialog::Accepted) {
-                std::string mnemonic = bip39Dlg.getMnemonic().toStdString();
-                std::string passphrase = bip39Dlg.getPassphrase().toStdString();
+                if (bip39Dlg.exec() == QDialog::Accepted) {
+                    std::string mnemonic = bip39Dlg.getMnemonic().toStdString();
+                    std::string passphrase = bip39Dlg.getPassphrase().toStdString();
 
-                pwalletMain->strMnemonic = mnemonic.c_str();
-                pwalletMain->strMnemonicPassphrase = passphrase.c_str();
-                pwalletMain->nBip39Counter = 0;
+                    pwalletMain->strMnemonic = mnemonic.c_str();
+                    pwalletMain->strMnemonicPassphrase = passphrase.c_str();
+                    pwalletMain->nBip39Counter = 0;
 
-                {
-                    CWalletDB walletdb(pwalletMain->strWalletFile);
-                    walletdb.WriteMnemonic(mnemonic);
-                    walletdb.WriteMnemonicPassphrase(passphrase);
-                    walletdb.WriteBip39Counter(0);
+                    {
+                        CWalletDB walletdb(pwalletMain->strWalletFile);
+                        walletdb.WriteMnemonic(mnemonic);
+                        walletdb.WriteMnemonicPassphrase(passphrase);
+                        walletdb.WriteBip39Counter(0);
+                        
+                        for (std::map<CTxDestination, std::string>::iterator it = pwalletMain->mapAddressBook.begin(); it != pwalletMain->mapAddressBook.end(); ++it) {
+                            walletdb.EraseName(CHexlanAddress(it->first).ToString());
+                            pwalletMain->NotifyAddressBookChanged(pwalletMain, it->first, it->second, ::IsMine(*pwalletMain, it->first) != ISMINE_NO, CT_DELETED);
+                        }
+                    } 
                     
-                    // HEXLAN: Уничтожаем зомби-адрес, созданный до инициализации BIP39
-                    for (std::map<CTxDestination, std::string>::iterator it = pwalletMain->mapAddressBook.begin(); it != pwalletMain->mapAddressBook.end(); ++it) {
-                        walletdb.EraseName(CHexlanAddress(it->first).ToString()); // Удаляем из БД
-                        pwalletMain->NotifyAddressBookChanged(pwalletMain, it->first, it->second, ::IsMine(*pwalletMain, it->first) != ISMINE_NO, CT_DELETED); // Удаляем из UI
-                    }
-                } // Lock released here!
-                
-                pwalletMain->mapAddressBook.clear(); // Очищаем RAM
-                pwalletMain->setKeyPool.clear();
-                pwalletMain->TopUpKeyPool();
+                    pwalletMain->mapAddressBook.clear();
+                    pwalletMain->setKeyPool.clear();
+                    pwalletMain->nTimeFirstKey = 1; // HEXLAN: Сброс даты для поиска истории
+                    pwalletMain->TopUpKeyPool();
+                    
+                    // HEXLAN: Запуск рескана из GUI
+                    pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
+                    pwalletMain->ReacceptWalletTransactions();
+                } else {
+                    QMessageBox::critical(this, tr("Initialization Failed"), tr("Initialization cancelled. The application will now exit."));
+                    exit(0);
+                }
+            } else if (msgBox.clickedButton() == watchBtn) {
+                QMessageBox::information(this, tr("Watch-Only Mode"), tr("Wallet started in Watch-Only mode.\nUse 'File -> Import Watch-Only xpub...' to add your extended public key."));
             } else {
-                QMessageBox::critical(this, tr("Initialization Failed"), tr("A mnemonic phrase is strictly required to operate the Hexlan wallet. The application will now exit."));
                 exit(0);
             }
         }
@@ -1390,4 +1418,46 @@ void BitcoinGUI::showMnemonicClicked()
     QString message = tr("<b>Mnemonic Phrase:</b><br/><p>%1</p><br/><b>Passphrase:</b><br/>%2")
                         .arg(mnemonic).arg(passphrase.isEmpty() ? "<i>none</i>" : passphrase);
     QMessageBox::information(this, tr("BIP39 Seed Backup"), message);
+}
+
+void BitcoinGUI::importXpubClicked()
+{
+    bool ok;
+    QString xpub = QInputDialog::getText(this, tr("Import Watch-Only xpub"),
+                                         tr("Enter your BIP32 Extended Public Key (xpub...):"), QLineEdit::Normal,
+                                         "", &ok);
+    if (ok && !xpub.isEmpty()) {
+        QProgressDialog progress(tr("Importing addresses and scanning blockchain...\nThis may take a few minutes."), tr("Cancel"), 0, 0, this);
+        progress.setWindowModality(Qt::WindowModal);
+        progress.show();
+        QApplication::processEvents();
+
+        try {
+            json_spirit::Array params;
+            params.push_back(xpub.trimmed().toStdString()); // HEXLAN: Защита от случайных пробелов
+            params.push_back(100); 
+            params.push_back(true); 
+            
+            json_spirit::Value result;
+            {
+                // HEXLAN: Жизненно важные блокировки потоков перед сканированием!
+                LOCK2(cs_main, pwalletMain->cs_wallet);
+                result = importxpub(params, false);
+            }
+            
+            progress.close();
+            QMessageBox::information(this, tr("Success"), tr("xpub imported successfully! Check your Dashboard for balances."));
+        } catch (const json_spirit::Object& obj) {
+            progress.close();
+            // Вытаскиваем человекочитаемое сообщение из JSON
+            std::string err_msg = "Unknown RPC Error";
+            for (unsigned int i = 0; i < obj.size(); i++) {
+                if (obj[i].name_ == "message") err_msg = obj[i].value_.get_str();
+            }
+            QMessageBox::critical(this, tr("Import Error"), tr("Failed to import xpub:\n") + QString::fromStdString(err_msg));
+        } catch (const std::exception& e) {
+            progress.close();
+            QMessageBox::critical(this, tr("System Error"), tr("Failed to import xpub:\n") + QString::fromStdString(e.what()));
+        }
+    }
 }
