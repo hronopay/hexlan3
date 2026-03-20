@@ -1153,9 +1153,16 @@ void CWalletTx::GetAmounts(list<pair<CTxDestination, int64_t> >& listReceived,
         CTxDestination address;
         if (!ExtractDestination(txout.scriptPubKey, address))
         {
-            LogPrintf("CWalletTx::GetAmounts: Unknown transaction type found, txid %s\n",
-                     this->GetHash().ToString());
-            address = CNoDestination();
+            // HEXLAN: Попытка ручного извлечения для SegWit (Bech32), если ExtractDestination спасовал
+            if (txout.scriptPubKey.size() == 22 && txout.scriptPubKey[0] == 0x00 && txout.scriptPubKey[1] == 0x14) {
+                uint160 hash;
+                memcpy(&hash, &txout.scriptPubKey[2], 20);
+                address = WitnessV0KeyHash(hash);
+            } else {
+                LogPrintf("CWalletTx::GetAmounts: Unknown transaction type found, txid %s\n",
+                         this->GetHash().ToString());
+                address = CNoDestination();
+            }
         }
 
         // If we are debited by the transaction, add the output as a "sent" entry
