@@ -189,6 +189,7 @@ const char* GetTxnOutputType(txnouttype t)
     switch (t)
     {
     case TX_NONSTANDARD: return "nonstandard";
+    case TX_WITNESS_V0_KEYHASH: return "witness_v0_keyhash";
     case TX_PUBKEY: return "pubkey";
     case TX_PUBKEYHASH: return "pubkeyhash";
     case TX_SCRIPTHASH: return "scripthash";
@@ -2228,6 +2229,10 @@ bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubK
 //
 bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsigned char> >& vSolutionsRet)
 {
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0 && scriptPubKey[1] == 0x14) {
+        typeRet = TX_WITNESS_V0_KEYHASH;
+        return true;
+    }
     // Templates
     static multimap<txnouttype, CScript> mTemplates;
     if (mTemplates.empty())
@@ -2387,6 +2392,15 @@ bool SignN(const vector<valtype>& multisigdata, const CKeyStore& keystore, uint2
 bool Solver(const CKeyStore& keystore, const CScript& scriptPubKey, uint256 hash, int nHashType,
                   CScript& scriptSigRet, txnouttype& whichTypeRet)
 {
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == OP_0 && scriptPubKey[1] == 0x14) {
+        whichTypeRet = TX_WITNESS_V0_KEYHASH;
+        return true;
+    }
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == OP_0 && scriptPubKey[1] == 0x14) {
+        whichTypeRet = TX_WITNESS_V0_KEYHASH;
+        
+        return true;
+    }
     scriptSigRet.clear();
 
     vector<valtype> vSolutions;
