@@ -4214,7 +4214,7 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
 
             // Сканируем 1000 адресов сдачи наперед для восстановления
             int nRecovered = 0;
-            for (int i = 0; i < 1000; i++) {
+            for (int i = 0; i < 100; i++) {
                 CExtKey childKey;
                 changeBranch.Derive(childKey, i);
                 CKey secret = childKey.key;
