@@ -2532,6 +2532,10 @@ isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
 
 isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 {
+    // HEXLAN: Принудительная проверка Watch-Only ДО попыток извлечения адреса (иначе SegWit ломает hot-wallet)
+    if (keystore.HaveWatchOnly(scriptPubKey))
+        return ISMINE_WATCH_ONLY;
+
     // Hexlan: SegWit BIP84 recognition for balance
     if (scriptPubKey.size() == 22 && scriptPubKey[0] == OP_0 && scriptPubKey[1] == 0x14) {
         std::vector<unsigned char> hashBytes(scriptPubKey.begin() + 2, scriptPubKey.end());
