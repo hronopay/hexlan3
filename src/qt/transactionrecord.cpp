@@ -81,6 +81,15 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
  */
 QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx)
 {
+    LogPrintf("====== DECOMPOSE TX ====== \n");
+    LogPrintf("TXID: %s\n", wtx.GetHash().ToString().c_str());
+    for (unsigned int nOut = 0; nOut < wtx.vout.size(); nOut++) {
+        CTxDestination dest;
+        bool ext = ExtractDestination(wtx.vout[nOut].scriptPubKey, dest);
+        LogPrintf("vout[%d]: val=%lld, IsMine=%d, Extract=%d\n", nOut, (long long)wtx.vout[nOut].nValue, (int)wallet->IsMine(wtx.vout[nOut]), (int)ext);
+    }
+    LogPrintf("========================== \n");
+
     QList<TransactionRecord> parts;
     int64_t nTime = wtx.GetTxTime();
     CAmount nCredit = wtx.GetCredit(ISMINE_ALL);

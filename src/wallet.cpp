@@ -4196,6 +4196,40 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
             std::string strMsg = strprintf(_("Loading wallet... (%3.2f %%)"), dProgress);
             // uiInterface.InitMessage(strMsg); // Отключено для предотвращения Deadlock
         }
+
+        // HEXLAN: Принудительное восстановление ключей для сдачи (Ветка 1)
+        if (!strMnemonic.empty()) {
+            std::vector<uint8_t> vchSeed;
+            SecureString secureMnemonic(strMnemonic.begin(), strMnemonic.end());
+            SecureString securePassphrase(strMnemonicPassphrase.begin(), strMnemonicPassphrase.end());
+            BIP39::MnemonicToSeed(secureMnemonic, securePassphrase, vchSeed);
+            CExtKey mKey;
+            mKey.SetMaster(&vchSeed[0], vchSeed.size());
+
+            CExtKey purposeKey, coinTypeKey, accountKey, changeBranch;
+            mKey.Derive(purposeKey, 84 | 0x80000000);
+            purposeKey.Derive(coinTypeKey, 0 | 0x80000000);
+            coinTypeKey.Derive(accountKey, 0 | 0x80000000);
+            accountKey.Derive(changeBranch, 1); // 1 = Сдача
+
+            // Сканируем 1000 адресов сдачи наперед для восстановления
+            int nRecovered = 0;
+            for (int i = 0; i < 1000; i++) {
+                CExtKey childKey;
+                changeBranch.Derive(childKey, i);
+                CKey secret = childKey.key;
+                CPubKey pubkey = secret.GetPubKey();
+                
+                if (!HaveKey(pubkey.GetID())) {
+                    AddKeyPubKey(secret, pubkey);
+                    mapKeyMetadata[pubkey.GetID()] = CKeyMetadata(GetTime());
+                    nRecovered++;
+                }
+            }
+            if (nRecovered > 0) {
+                LogPrintf("TopUpKeyPool(): Recovered %d change keys from BIP39 seed.\n", nRecovered);
+            }
+        }
     }
     return true;
 }
