@@ -2596,6 +2596,14 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
+    // HEXLAN: Извлечение SegWit адреса
+    if (scriptPubKey.size() == 22 && scriptPubKey[0] == 0x00 && scriptPubKey[1] == 0x14) {
+        uint160 hash;
+        memcpy(&hash, &scriptPubKey[2], 20);
+        addressRet = WitnessV0KeyHash(hash);
+        return true;
+    }
+
     vector<valtype> vSolutions;
     txnouttype whichType;
     if (!Solver(scriptPubKey, whichType, vSolutions))

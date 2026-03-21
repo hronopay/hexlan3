@@ -7,6 +7,7 @@
 #include "hash.h"
 #include "uint256.h"
 #include "chainparams.h"
+#include "segwit_addr.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -212,6 +213,16 @@ bool CBase58Data::SetString(const std::string& str) {
 }
 
 std::string CBase58Data::ToString() const {
+    if (vchVersion.empty() && vchData.size() == 20) {
+        uint160 id;
+        memcpy(&id, &vchData[0], 20);
+        return EncodeDestination(WitnessV0KeyHash(id));
+    }
+    if (vchVersion.empty() && vchData.size() == 32) {
+        uint256 id;
+        memcpy(&id, &vchData[0], 32);
+        return EncodeDestination(WitnessV0ScriptHash(id));
+    }
     std::vector<unsigned char> vch = vchVersion;
     vch.insert(vch.end(), vchData.begin(), vchData.end());
     return EncodeBase58Check(vch);
@@ -226,6 +237,12 @@ int CBase58Data::CompareTo(const CBase58Data& b58) const {
 }
 
 namespace {
+    struct Base58Exposer : public CBase58Data {
+        static void Set(CBase58Data* obj, const std::vector<unsigned char>& data) {
+            ((Base58Exposer*)obj)->SetData(std::vector<unsigned char>(), &data[0], data.size());
+        }
+    };
+
     class CHexlanAddressVisitor : public boost::static_visitor<bool> {
     private:
         CHexlanAddress *addr;
@@ -236,8 +253,16 @@ namespace {
         bool operator()(const CScriptID &id) const { return addr->Set(id); }
         bool operator()(const CNoDestination &no) const { return false; }
         bool operator()(const CStealthAddress &stxAddr) const { return false; }
-        bool operator()(const WitnessV0KeyHash &id) const { return false; }
-        bool operator()(const WitnessV0ScriptHash &id) const { return false; }
+        bool operator()(const WitnessV0KeyHash &id) const { 
+            std::vector<unsigned char> data(id.begin(), id.end());
+            Base58Exposer::Set(addr, data);
+            return true; 
+        }
+        bool operator()(const WitnessV0ScriptHash &id) const { 
+            std::vector<unsigned char> data(id.begin(), id.end());
+            Base58Exposer::Set(addr, data);
+            return true; 
+        }
     };
     class CBitcoinAddressVisitor : public boost::static_visitor<bool> {
     private:
@@ -249,8 +274,16 @@ namespace {
         bool operator()(const CScriptID &id) const { return addr->Set(id); }
         bool operator()(const CNoDestination &no) const { return false; }
         bool operator()(const CStealthAddress &stxAddr) const { return false; }
-        bool operator()(const WitnessV0KeyHash &id) const { return false; }
-        bool operator()(const WitnessV0ScriptHash &id) const { return false; }
+        bool operator()(const WitnessV0KeyHash &id) const { 
+            std::vector<unsigned char> data(id.begin(), id.end());
+            Base58Exposer::Set(addr, data);
+            return true; 
+        }
+        bool operator()(const WitnessV0ScriptHash &id) const { 
+            std::vector<unsigned char> data(id.begin(), id.end());
+            Base58Exposer::Set(addr, data);
+            return true; 
+        }
     };
 };
 
@@ -269,6 +302,8 @@ bool CHexlanAddress::Set(const CTxDestination &dest) {
 }
 
 bool CHexlanAddress::IsValid() const {
+    if (vchVersion.empty() && (vchData.size() == 20 || vchData.size() == 32))
+        return true;
     bool fCorrectSize = vchData.size() == 20;
     bool fKnownVersion = vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS) ||
                          vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS);
@@ -278,6 +313,16 @@ bool CHexlanAddress::IsValid() const {
 CTxDestination CHexlanAddress::Get() const {
     if (!IsValid())
         return CNoDestination();
+    if (vchVersion.empty() && vchData.size() == 20) {
+        uint160 id;
+        memcpy(&id, &vchData[0], 20);
+        return WitnessV0KeyHash(id);
+    }
+    if (vchVersion.empty() && vchData.size() == 32) {
+        uint256 id;
+        memcpy(&id, &vchData[0], 32);
+        return WitnessV0ScriptHash(id);
+    }
     uint160 id;
     memcpy(&id, &vchData[0], 20);
     if (vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))
@@ -351,6 +396,8 @@ bool CBitcoinAddress::Set(const CTxDestination &dest) {
 }
 
 bool CBitcoinAddress::IsValid() const {
+    if (vchVersion.empty() && (vchData.size() == 20 || vchData.size() == 32))
+        return true;
     bool fCorrectSize = vchData.size() == 20;
     bool fKnownVersion = vchVersion == Params().Base58Prefix(pubkey_address) ||
                          vchVersion == Params().Base58Prefix(script_address);
@@ -360,6 +407,16 @@ bool CBitcoinAddress::IsValid() const {
 CTxDestination CBitcoinAddress::Get() const {
     if (!IsValid())
         return CNoDestination();
+    if (vchVersion.empty() && vchData.size() == 20) {
+        uint160 id;
+        memcpy(&id, &vchData[0], 20);
+        return WitnessV0KeyHash(id);
+    }
+    if (vchVersion.empty() && vchData.size() == 32) {
+        uint256 id;
+        memcpy(&id, &vchData[0], 32);
+        return WitnessV0ScriptHash(id);
+    }
     uint160 id;
     memcpy(&id, &vchData[0], 20);
     if (vchVersion == Params().Base58Prefix(pubkey_address))
