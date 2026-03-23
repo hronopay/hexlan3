@@ -174,7 +174,20 @@ CoinControlDialog::CoinControlDialog(QWidget *parent) :
     // see https://github.com/bitcoin/bitcoin/issues/5716
     // ui->treeWidget->headerItem()->setText(COLUMN_CHECKBOX, QString());
 
+    // HEXLAN: Переопределяем заголовки, чтобы избежать сдвига из-за .ui файла
+    ui->treeWidget->setColumnCount(COLUMN_DATE_INT64 + 1);
+    ui->treeWidget->headerItem()->setText(COLUMN_CHECKBOX, QString());
+    ui->treeWidget->headerItem()->setText(COLUMN_NUMBER, "#");
+    ui->treeWidget->headerItem()->setText(COLUMN_AMOUNT, tr("Amount"));
+    ui->treeWidget->headerItem()->setText(COLUMN_LABEL, tr("Label"));
+    ui->treeWidget->headerItem()->setText(COLUMN_ADDRESS, tr("Address"));
+    ui->treeWidget->headerItem()->setText(COLUMN_DARKSEND_ROUNDS, tr("Darksend Rounds"));
+    ui->treeWidget->headerItem()->setText(COLUMN_DATE, tr("Date"));
+    ui->treeWidget->headerItem()->setText(COLUMN_CONFIRMATIONS, tr("Confirmations"));
+    ui->treeWidget->headerItem()->setText(COLUMN_PRIORITY, tr("Priority"));
+
     ui->treeWidget->setColumnWidth(COLUMN_CHECKBOX, 84);
+    ui->treeWidget->setColumnWidth(COLUMN_NUMBER, 35);
     ui->treeWidget->setColumnWidth(COLUMN_AMOUNT, 100);
     ui->treeWidget->setColumnWidth(COLUMN_LABEL, 170);
     ui->treeWidget->setColumnWidth(COLUMN_ADDRESS, 190);
@@ -757,6 +770,8 @@ void CoinControlDialog::updateView()
     std::map<QString, std::vector<COutput> > mapCoins;
     model->listCoins(mapCoins);
 
+    int nGlobalRowCounter = 1; // HEXLAN: Счетчик для Coin Control
+
     BOOST_FOREACH(const PAIRTYPE(QString, std::vector<COutput>)& coins, mapCoins)
     {
         QTreeWidgetItem *itemWalletAddress = new QTreeWidgetItem();
@@ -849,6 +864,9 @@ void CoinControlDialog::updateView()
                     sLabel = tr("(no label)");
                 itemOutput->setText(COLUMN_LABEL, sLabel); 
             }
+
+            // HEXLAN: Вывод номера
+            itemOutput->setData(COLUMN_NUMBER, Qt::DisplayRole, nGlobalRowCounter++);
 
             // amount
             itemOutput->setText(COLUMN_AMOUNT, BitcoinUnits::format(nDisplayUnit, out.tx->vout[out.i].nValue));

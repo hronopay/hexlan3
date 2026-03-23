@@ -53,6 +53,7 @@ private:
     enum
     {
         COLUMN_CHECKBOX,
+        COLUMN_NUMBER, // HEXLAN: Нумерация
         COLUMN_AMOUNT,
         COLUMN_LABEL,
         COLUMN_ADDRESS,
