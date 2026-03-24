@@ -210,15 +210,30 @@ void OverviewPage::setBalance(const CAmount& balance, const CAmount& stake, cons
     ui->labelWatchImmature->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, watchImmatureBalance));
     ui->labelWatchTotal->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, watchOnlyBalance + watchOnlyStake + watchUnconfBalance + watchImmatureBalance));
 
+    // HEXLAN: Скрываем колонку обычного баланса, если он нулевой, а Watch-Only имеет средства
+    bool hasNormalBalance = (balance > 0 || stake > 0 || unconfirmedBalance > 0 || immatureBalance > 0 || anonymizedBalance > 0);
+    bool hasWatchOnlyBalance = (watchOnlyBalance > 0 || watchOnlyStake > 0 || watchUnconfBalance > 0 || watchImmatureBalance > 0);
+    bool showNormal = hasNormalBalance || !hasWatchOnlyBalance;
+
+    ui->labelSpendable->setVisible(showNormal);
+    ui->labelBalance->setVisible(showNormal);
+    ui->labelStake->setVisible(showNormal);
+    ui->labelUnconfirmed->setVisible(showNormal);
+    ui->labelAnonymized->setVisible(showNormal);
+    ui->labelAnonymizedText->setVisible(showNormal);
+    ui->labelTotal->setVisible(showNormal);
+    ui->lineSpendableBalance->setVisible(showNormal);
+
     // only show immature (newly mined) balance if it's non-zero, so as not to complicate things
     // for the non-mining users
     bool showImmature = immatureBalance != 0;
     bool showWatchOnlyImmature = watchImmatureBalance != 0;
 
     // for symmetry reasons also show immature label when the watch-only one is shown
-    ui->labelImmature->setVisible(showImmature || showWatchOnlyImmature);
+    ui->labelImmature->setVisible((showImmature || showWatchOnlyImmature) && showNormal);
     ui->labelImmatureText->setVisible(showImmature || showWatchOnlyImmature);
     ui->labelWatchImmature->setVisible(showWatchOnlyImmature); // show watch-only immature balance
+
 
     updateDarksendProgress();
 
@@ -463,7 +478,8 @@ void OverviewPage::darkSendStatus()
         if(nBestHeight != darkSendPool.cachedNumBlocks)
         {
             darkSendPool.cachedNumBlocks = nBestHeight;
-            updateDarksendProgress();
+        
+    updateDarksendProgress();
 
             ui->darksendEnabled->setText(tr("Disabled"));
             ui->darksendStatus->setText("");
@@ -479,7 +495,8 @@ void OverviewPage::darkSendStatus()
         // Balance and number of transactions might have changed
         darkSendPool.cachedNumBlocks = nBestHeight;
 
-        updateDarksendProgress();
+    
+    updateDarksendProgress();
 
         ui->darksendEnabled->setText(tr("Enabled"));
     }
