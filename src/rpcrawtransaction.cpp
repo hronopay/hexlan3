@@ -6,6 +6,7 @@
 #include <boost/assign/list_of.hpp>
 
 #include "base58.h"
+#include "segwit_addr.h"
 #include "rpcserver.h"
 #include "txdb.h"
 #include "init.h"
@@ -271,19 +272,18 @@ Value createrawtransaction(const Array& params, bool fHelp)
         rawTx.vin.push_back(in);
     }
 
-    set<CHexlanAddress> setAddress;
+    std::set<std::string> setAddress;
     BOOST_FOREACH(const Pair& s, sendTo)
     {
-        CHexlanAddress address(s.name_);
-        if (!address.IsValid())
+        if (!IsValidDestinationString(s.name_))
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid Hexlan address: ")+s.name_);
 
-        if (setAddress.count(address))
+        if (setAddress.count(s.name_))
             throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);
-        setAddress.insert(address);
+        setAddress.insert(s.name_);
 
         CScript scriptPubKey;
-        scriptPubKey.SetDestination(address.Get());
+        scriptPubKey.SetDestination(DecodeDestination(s.name_));
         CAmount nAmount = AmountFromValue(s.value_);
 
         CTxOut out(nAmount, scriptPubKey);
