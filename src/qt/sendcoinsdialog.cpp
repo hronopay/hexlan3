@@ -1,3 +1,4 @@
+#include "offlinetxdialog.h"
 // Copyright (c) 2011-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -397,8 +398,49 @@ void SendCoinsDialog::send(QList<SendCoinsRecipient> recipients, QString strFee,
 
     // now send the prepared transaction
     WalletModel::SendCoinsReturn sendStatus = model->sendCoins(currentTransaction, CoinControlDialog::coinControl);
+    
+    LogPrintf("=== TRACE [3/3]: sendcoinsdialog.cpp -> model->sendCoins returned status: %d ===\n", sendStatus.status);
+    if (sendStatus.reasonCommit.length() > 0) {
+        LogPrintf("=== TRACE [3/3 INFO]: Reason string is: %s ===\n", sendStatus.reasonCommit.toStdString().c_str());
+    }
+
+    
+    // ГРОМКИЙ ДЕБАГ:
+    if (sendStatus.status == WalletModel::PrepareTransactionFailed) {
+        QMessageBox::warning(this, "Debug", "Status: PrepareTransactionFailed\nReason: " + sendStatus.reasonCommit);
+    } else if (sendStatus.status == WalletModel::OK) {
+        // Если статус OK, но окно не вылезло - значит мы пролетели мимо
+    } else {
+        QMessageBox::critical(this, "Debug", "Other Status: " + QString::number(sendStatus.status));
+    }
+
+
+    if (sendStatus.status == WalletModel::PrepareTransactionFailed && sendStatus.reasonCommit == "OFFLINE_READY")
+    {
+        // Достаем HEX
+        CWalletTx *wtx = currentTransaction.getTransaction();
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        ss << (CTransaction)*wtx;
+        std::string strHex = HexStr(ss.begin(), ss.end());
+
+        QString json = "{\"hex\":\"" + QString::fromStdString(strHex) + "\"}";
+
+        OfflineTxDialog dlg(json, this);
+        dlg.exec();
+        accept();
+        return;
+    }
+
     // process sendStatus and on error generate message shown to user
     processSendCoinsReturn(sendStatus);
+
+    if (sendStatus.status == WalletModel::PrepareTransactionFailed && sendStatus.reasonCommit == "OFFLINE_READY")
+    {
+        OfflineTxDialog dlg("INITIAL_TEST_PACKET", this);
+        dlg.exec();
+        accept();
+        return;
+    }
 
     if (sendStatus.status == WalletModel::OK)
     {

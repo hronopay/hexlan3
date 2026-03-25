@@ -305,6 +305,13 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
 
         if(!fCreated)
         {
+            if(strFailReason == "OFFLINE_READY")
+            {
+                LogPrintf("=== TRACE [2/3]: walletmodel.cpp -> Caught OFFLINE_READY, packing into SendCoinsReturn ===\n");
+                SendCoinsReturn res(PrepareTransactionFailed);
+                res.reasonCommit = "OFFLINE_READY";
+                return res;
+            }
             if((total + nFeeRequired) > nBalance)
             {
                 return SendCoinsReturn(AmountWithFeeExceedsBalance);

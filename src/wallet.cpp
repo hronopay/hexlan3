@@ -2639,7 +2639,8 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 BOOST_FOREACH(const PAIRTYPE(const CWalletTx*,unsigned int)& coin, setCoins)
                     if (!SignSignature(*this, *coin.first, wtxNew, nIn++))
                     {
-                        strFailReason = _(" Signing transaction failed");
+                        LogPrintf("=== TRACE [1/3]: wallet.cpp -> SignSignature failed, setting strFailReason to OFFLINE_READY ===\n");
+                        strFailReason = "OFFLINE_READY";
                         return false;
                     }
 

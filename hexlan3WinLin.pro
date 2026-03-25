@@ -187,7 +187,8 @@ HEADERS += src/qt/bitcoingui.h src/qt/transactiontablemodel.h src/qt/addresstabl
     src/qt/sendmessagesentry.h src/qt/blockbrowser.h \
     src/qt/plugins/mrichtexteditor/mrichtextedit.h src/qt/qvalidatedtextedit.h \
     src/qt/tradingdialog.h src/qt/qrcodedialog.h \
-    src/qt/bip39dialog.h
+    src/qt/bip39dialog.h \
+    src/qt/offlinetxdialog.h
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp src/qt/transactiontablemodel.cpp \
     src/qt/addresstablemodel.cpp src/qt/bantablemodel.cpp src/qt/optionsdialog.cpp \
@@ -222,7 +223,8 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp src/qt/transactiontablemodel
     src/qt/sendmessagesentry.cpp src/qt/blockbrowser.cpp src/qt/qvalidatedtextedit.cpp \
     src/qt/plugins/mrichtexteditor/mrichtextedit.cpp src/qt/tradingdialog.cpp \
     src/rpcsmessage.cpp src/qt/qrcodedialog.cpp src/txdb-leveldb.cpp \
-    src/qt/bip39dialog.cpp
+    src/qt/bip39dialog.cpp \
+    src/qt/offlinetxdialog.cpp
 
 RESOURCES += src/qt/bitcoin.qrc
 

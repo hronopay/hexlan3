@@ -144,6 +144,7 @@ public:
     // Return status record for SendCoins, contains error id + information
     struct SendCoinsReturn
     {
+        QString reasonCommit;
         SendCoinsReturn(StatusCode status = OK):
             status(status) {}
         StatusCode status;
